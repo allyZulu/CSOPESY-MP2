@@ -2,14 +2,33 @@
 #include <iostream>
 #include <cstdint>
 
-Scheduler::Scheduler(int numCores, const std::string& algorithm, int quantum, int delay)
-    : numCores(numCores), schedulingAlgorithm(algorithm), quantum(quantum), isRunning(true), delayPerExec(delay){
+// Scheduler::Scheduler(int numCores, const std::string& algorithm, int quantum, int delay, 
+//     int maxMemory = 16384, int frameSize = 16, int memoryPerProcess = 4096)
+//     : numCores(numCores), schedulingAlgorithm(algorithm), quantum(quantum), isRunning(true), delayPerExec(delay)
+//     {
+//     cores.resize(numCores);
+//     memoryManager = std::make_shared<MemoryManager>(maxMemory, frameSize, memoryPerProcess);
+// }
+
+Scheduler::Scheduler(int numCores, const std::string& algorithm, int quantum, int delay, 
+                     MemoryManager* memoryManagerPtr)
+    : numCores(numCores), schedulingAlgorithm(algorithm), quantum(quantum), isRunning(true), delayPerExec(delay)
+{
     cores.resize(numCores);
+    memoryManager = std::shared_ptr<MemoryManager>(memoryManagerPtr);
 }
 
+
 void Scheduler::addProcess(std::shared_ptr<Process> process) {
-    process->setState(Process::READY);
-    readyQueue.push(process);
+    // process->setState(Process::READY);
+    // readyQueue.push(process);
+    if (memoryManager->allocate(process)) {
+        process->setState(Process::READY);
+        readyQueue.push(process);
+    } else {
+        // Re-queue if memory full
+        readyQueue.push(process);
+    }
 }
 
 void Scheduler::tick() {
@@ -65,6 +84,9 @@ void Scheduler::executeProcesses() {
             }
         }
     }
+
+    currentQuantumCycle++;
+    memoryManager->snapshot(currentQuantumCycle);
 }
 
 void Scheduler::stop() {

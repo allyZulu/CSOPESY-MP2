@@ -99,6 +99,7 @@ void ConsoleManager::run() {
 
 void ConsoleManager::initialize() {
     loadConfig();
+    memoryManager = std::make_unique<MemoryManager>(16384, 16, 4096);
     isInitialized = true;
     std::cout << "System initialized successfully.\n";
 }
@@ -138,7 +139,9 @@ void ConsoleManager::loadConfig() {
 void ConsoleManager::startScheduler() {
     std::cout << "Starting process generation...\n";
 
-    scheduler = std::make_unique<Scheduler>(numCPU, schedulerAlgo, quantumCycles);
+    scheduler = std::make_unique<Scheduler>(numCPU, schedulerAlgo, quantumCycles, delayPerExec, memoryManager.get());
+
+    //scheduler = std::make_unique<Scheduler>(numCPU, schedulerAlgo, quantumCycles);
     // For simulation
     for (int i = 0; i < batchProcessFreq; ++i) {
         std::string procName = "p" + std::to_string(currentPID + 1);
@@ -155,6 +158,8 @@ void ConsoleManager::startScheduler() {
     schedulerThread = std::thread([this](){
         while (ticking){
             scheduler->tick();
+            quantumCounter++;
+            memoryManager->snapshot(quantumCounter);
             std::this_thread::sleep_for(std::chrono::milliseconds(cpuCycleTicks));
         }
 
@@ -176,21 +181,7 @@ void ConsoleManager::startScheduler() {
 
     }).detach();
 
-    // // create scheduler
-    // scheduler = std::make_unique<Scheduler>(numCPU, schedulerAlgo, quantumCycles);
-    // for(const auto& proc : allProcesses){
-    //     scheduler->addProcess(proc);
-    // }
-
-    // //ticking thread
-    // ticking = true;
-    // schedulerThread = std::thread([this]() {
-    //     while (ticking) {
-    //     //    std::cout << "[TICK]\n";
-    //         scheduler->tick();
-    //         std::this_thread::sleep_for(std::chrono::milliseconds(delayPerExec));
-    //     }
-    // });
+  
     std::cout<<"Scheduler started\n"; 
 
 }

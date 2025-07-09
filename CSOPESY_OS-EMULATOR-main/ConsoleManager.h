@@ -6,6 +6,7 @@
 #include <vector>
 #include "Process.h"
 #include "Scheduler.h"
+#include "MemoryManager.h"
 #include <thread>
 #include <atomic>
 
@@ -39,6 +40,9 @@ private:
 
     std::unordered_map<std::string, std::shared_ptr<Process>> processTable;
     std::vector<std::shared_ptr<Process>> allProcesses;
+
+    std::unique_ptr<MemoryManager> memoryManager;
+    int quantumCounter = 0;
 
     void processScreen(std::shared_ptr<Process> process);
     void loadConfig();
