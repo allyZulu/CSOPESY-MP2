@@ -99,7 +99,7 @@ void ConsoleManager::run() {
 
 void ConsoleManager::initialize() {
     loadConfig();
-    memoryManager = std::make_unique<MemoryManager>(16384, 16, 4096);
+    memoryManager = std::make_unique<MemoryManager>(maxOverallMem, memPerFrame, memPerProc);
     isInitialized = true;
     std::cout << "System initialized successfully.\n";
 }
@@ -111,6 +111,9 @@ void ConsoleManager::printConfig() const {
     std::cout << "Batch Process Frequency: " << batchProcessFreq << "seconds\n";
     std::cout << "Instruction Range: " << minInstructions << " - " << maxInstructions << "\n";
     std::cout << "Delay per Execution: " << delayPerExec << "ms\n"; 
+    std::cout << "Max Overall Memory: " << maxOverallMem << "KB\n";
+    std::cout << "Memory per Frame: " << memPerFrame << "KB\n";
+    std::cout << "Memory per Process: " << memPerProc << "KB\n";
 }
 
 void ConsoleManager::loadConfig() {
@@ -129,11 +132,19 @@ void ConsoleManager::loadConfig() {
         else if (key == "min-ins") file >> minInstructions;
         else if (key == "max-ins") file >> maxInstructions;
         else if (key == "delay-per-exec") file >> delayPerExec;
+        else if (key == "max-overall-mem") file >> maxOverallMem; 
+        else if (key == "mem-per-frame") file >> memPerFrame;
+        else if (key == "mem-per-proc") file >> memPerProc;
+        else {
+            std::cout << "Unknown config key: " << key << "\n";
+        }
     }
 
     std::cout << "Config loaded: " << numCPU << " CPUs, Scheduler = " << schedulerAlgo
               << ", Quantum = " << quantumCycles << ", Min/Max Instructions = "
-              << minInstructions << "/" << maxInstructions << ", Delay = " << delayPerExec << "\n";
+              << minInstructions << "/" << maxInstructions << ", Delay = " << delayPerExec << "\n" 
+              << "Max Overall Memory: " << maxOverallMem << "KB, Memory per Frame: " << memPerFrame
+              << "KB, Memory per Process: " << memPerProc << "KB\n";
 }
 
 void ConsoleManager::startScheduler() {

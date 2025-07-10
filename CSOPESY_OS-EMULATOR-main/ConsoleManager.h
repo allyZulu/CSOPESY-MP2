@@ -54,4 +54,8 @@ private:
     int minInstructions = 5;
     int maxInstructions = 10;
     int delayPerExec = 0;
+    int maxOverallMem = 1024;   
+    int memPerFrame = 64; 
+    int memPerProc = 128; 
+
 };
