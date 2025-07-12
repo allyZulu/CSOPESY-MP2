@@ -99,7 +99,7 @@ void ConsoleManager::run() {
 
 void ConsoleManager::initialize() {
     loadConfig();
-    memoryManager = std::make_unique<MemoryManager>(maxOverallMem, memPerFrame, memPerProc);
+    memoryManager = std::make_unique<MemoryManager>(16384, 16, 4096);
     isInitialized = true;
     std::cout << "System initialized successfully.\n";
 }
@@ -111,9 +111,6 @@ void ConsoleManager::printConfig() const {
     std::cout << "Batch Process Frequency: " << batchProcessFreq << "seconds\n";
     std::cout << "Instruction Range: " << minInstructions << " - " << maxInstructions << "\n";
     std::cout << "Delay per Execution: " << delayPerExec << "ms\n"; 
-    std::cout << "Max Overall Memory: " << maxOverallMem << "KB\n";
-    std::cout << "Memory per Frame: " << memPerFrame << "KB\n";
-    std::cout << "Memory per Process: " << memPerProc << "KB\n";
 }
 
 void ConsoleManager::loadConfig() {
@@ -132,19 +129,11 @@ void ConsoleManager::loadConfig() {
         else if (key == "min-ins") file >> minInstructions;
         else if (key == "max-ins") file >> maxInstructions;
         else if (key == "delay-per-exec") file >> delayPerExec;
-        else if (key == "max-overall-mem") file >> maxOverallMem; 
-        else if (key == "mem-per-frame") file >> memPerFrame;
-        else if (key == "mem-per-proc") file >> memPerProc;
-        else {
-            std::cout << "Unknown config key: " << key << "\n";
-        }
     }
 
     std::cout << "Config loaded: " << numCPU << " CPUs, Scheduler = " << schedulerAlgo
               << ", Quantum = " << quantumCycles << ", Min/Max Instructions = "
-              << minInstructions << "/" << maxInstructions << ", Delay = " << delayPerExec << "\n" 
-              << "Max Overall Memory: " << maxOverallMem << "KB, Memory per Frame: " << memPerFrame
-              << "KB, Memory per Process: " << memPerProc << "KB\n";
+              << minInstructions << "/" << maxInstructions << ", Delay = " << delayPerExec << "\n";
 }
 
 void ConsoleManager::startScheduler() {
@@ -164,8 +153,6 @@ void ConsoleManager::startScheduler() {
 
     //start ticking
     ticking = true;
-    generating = true;
-
 
     //thick thread
     schedulerThread = std::thread([this](){
@@ -180,7 +167,7 @@ void ConsoleManager::startScheduler() {
 
     //make processes in the background
     std::thread([this](){
-        while(generating){
+        while(ticking){
             std::this_thread::sleep_for(std::chrono::seconds(batchProcessFreq));
 
             // Generate a new dummy process
@@ -200,29 +187,19 @@ void ConsoleManager::startScheduler() {
 }
 
 void ConsoleManager::stopScheduler() {
-    // if (!ticking) {
-    //     std::cout << "Scheduler is not running.\n";
-    //     return;
-    // }
-
-    // std::cout << "Stopping scheduler...\n";
-    // ticking = false;
-
-    // if (schedulerThread.joinable()) {
-    //     schedulerThread.join();
-    // }
-
-    // std::cout << "Scheduler stopped.\n";
-
-    if (!generating) {
-        std::cout << "Process generation is already stopped.\n";
+    if (!ticking) {
+        std::cout << "Scheduler is not running.\n";
         return;
     }
 
-    std::cout << "Stopping automatic process generation...\n";
-    generating = false;
+    std::cout << "Stopping scheduler...\n";
+    ticking = false;
 
-    std::cout << "No new processes will be auto-generated. Scheduler is still running.\n";
+    if (schedulerThread.joinable()) {
+        schedulerThread.join();
+    }
+
+    std::cout << "Scheduler stopped.\n";
 }
 
 void ConsoleManager::createProcess(const std::string& name, int instructionCount, bool silent) {

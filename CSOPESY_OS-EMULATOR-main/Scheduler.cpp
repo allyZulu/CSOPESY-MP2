@@ -25,11 +25,9 @@ void Scheduler::addProcess(std::shared_ptr<Process> process) {
     if (memoryManager->allocate(process)) {
         process->setState(Process::READY);
         readyQueue.push(process);
-    }
-    else {
+    } else {
         // Re-queue if memory full
         readyQueue.push(process);
-        //std::cout << "Insufficient memory for process " << process->getName() << "\n";
     }
 }
 
@@ -42,39 +40,23 @@ void Scheduler::tick() {
 void Scheduler::assignProcessesToCores() {
     for (int i = 0; i < numCores; ++i) {
         auto& core = cores[i];
-
-        // If the core has a process and finished, deallocate memory
-        if (core.currentProcess) {
-            if (core.currentProcess->isFinished()) {
-                memoryManager->deallocate(core.currentProcess);
+        if (!core.currentProcess || core.currentProcess->isFinished()) {
+            if (core.currentProcess && core.currentProcess->isFinished()) {
                 core.currentProcess->setState(Process::FINISHED);
                 core.currentProcess = nullptr;
             }
-        }
 
-        // If the core  empty assign a process 
-        if (!core.currentProcess) {
-            int queueSize = readyQueue.size(); // avoid infinite loop
-            for (int attempt = 0; attempt < queueSize; ++attempt) {
+            if (!readyQueue.empty()) {
                 auto nextProcess = readyQueue.front();
                 readyQueue.pop();
-
-                // allocate memory 
-                if (memoryManager->allocate(nextProcess)) {
-                    nextProcess->setCoreID(i);
-                    nextProcess->setState(Process::RUNNING);
-                    core.currentProcess = nextProcess;
-                    core.remainingQuantum = quantum;
-                    break;  // assigned successfully
-                } else {
-                    // No memory available push back to queue
-                    readyQueue.push(nextProcess);
-                }
+                nextProcess->setCoreID(i);
+                nextProcess->setState(Process::RUNNING);
+                core.currentProcess = nextProcess;
+                core.remainingQuantum = quantum;
             }
         }
     }
 }
- 
 
 void Scheduler::executeProcesses() {
     for (int i = 0; i < numCores; ++i) {
