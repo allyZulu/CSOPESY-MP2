@@ -25,9 +25,11 @@ void Scheduler::addProcess(std::shared_ptr<Process> process) {
     if (memoryManager->allocate(process)) {
         process->setState(Process::READY);
         readyQueue.push(process);
-    } else {
+    }
+    else {
         // Re-queue if memory full
         readyQueue.push(process);
+        //std::cout << "Insufficient memory for process " << process->getName() << "\n";
     }
 }
 
@@ -41,18 +43,41 @@ void Scheduler::assignProcessesToCores() {
     for (int i = 0; i < numCores; ++i) {
         auto& core = cores[i];
         if (!core.currentProcess || core.currentProcess->isFinished()) {
+            // std::cout << "Deallocating: " << core.currentProcess->getName() << "\n";
             if (core.currentProcess && core.currentProcess->isFinished()) {
+                memoryManager->deallocate(core.currentProcess); 
                 core.currentProcess->setState(Process::FINISHED);
                 core.currentProcess = nullptr;
             }
 
-            if (!readyQueue.empty()) {
+            int queueSize = readyQueue.size();
+            for (int attempt = 0; attempt < queueSize; ++attempt) {
                 auto nextProcess = readyQueue.front();
                 readyQueue.pop();
-                nextProcess->setCoreID(i);
-                nextProcess->setState(Process::RUNNING);
-                core.currentProcess = nextProcess;
-                core.remainingQuantum = quantum;
+
+                if (memoryManager->allocate(nextProcess)) {
+                    nextProcess->setCoreID(i);
+                    nextProcess->setState(Process::RUNNING);
+                    core.currentProcess = nextProcess;
+                    core.remainingQuantum = quantum;
+                    break;  // Stop after assigning one process
+                } else {
+                    // Could not allocate: requeue it
+                    readyQueue.push(nextProcess);
+                }
+            // if (!readyQueue.empty()) {
+            //     auto nextProcess = readyQueue.front();
+            //     readyQueue.pop();
+
+            //     if (memoryManager->allocate(nextProcess)) {
+            //         nextProcess->setCoreID(i);
+            //         nextProcess->setState(Process::RUNNING);
+            //         core.currentProcess = nextProcess;
+            //         core.remainingQuantum = quantum;
+            //     } else{
+            //         readyQueue.push(nextProcess);
+            //     }
+    
             }
         }
     }

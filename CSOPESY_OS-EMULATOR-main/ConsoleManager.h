@@ -36,6 +36,7 @@ private:
     std::unique_ptr<Scheduler> scheduler;
     std::thread schedulerThread;
     std::atomic<bool> ticking{false};
+    std::atomic<bool> generating{false};
     //added
 
     std::unordered_map<std::string, std::shared_ptr<Process>> processTable;

@@ -164,6 +164,8 @@ void ConsoleManager::startScheduler() {
 
     //start ticking
     ticking = true;
+    generating = true;
+
 
     //thick thread
     schedulerThread = std::thread([this](){
@@ -178,7 +180,7 @@ void ConsoleManager::startScheduler() {
 
     //make processes in the background
     std::thread([this](){
-        while(ticking){
+        while(generating){
             std::this_thread::sleep_for(std::chrono::seconds(batchProcessFreq));
 
             // Generate a new dummy process
@@ -198,19 +200,29 @@ void ConsoleManager::startScheduler() {
 }
 
 void ConsoleManager::stopScheduler() {
-    if (!ticking) {
-        std::cout << "Scheduler is not running.\n";
+    // if (!ticking) {
+    //     std::cout << "Scheduler is not running.\n";
+    //     return;
+    // }
+
+    // std::cout << "Stopping scheduler...\n";
+    // ticking = false;
+
+    // if (schedulerThread.joinable()) {
+    //     schedulerThread.join();
+    // }
+
+    // std::cout << "Scheduler stopped.\n";
+
+    if (!generating) {
+        std::cout << "Process generation is already stopped.\n";
         return;
     }
 
-    std::cout << "Stopping scheduler...\n";
-    ticking = false;
+    std::cout << "Stopping automatic process generation...\n";
+    generating = false;
 
-    if (schedulerThread.joinable()) {
-        schedulerThread.join();
-    }
-
-    std::cout << "Scheduler stopped.\n";
+    std::cout << "No new processes will be auto-generated. Scheduler is still running.\n";
 }
 
 void ConsoleManager::createProcess(const std::string& name, int instructionCount, bool silent) {

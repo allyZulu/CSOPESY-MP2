@@ -38,9 +38,11 @@ bool MemoryManager::allocate(std::shared_ptr<Process> process) {
 }
 
 void MemoryManager::deallocate(std::shared_ptr<Process> process) {
+    int pid = process->getPID();  // Get process ID for comparison
+
     memoryBlocks.erase(std::remove_if(memoryBlocks.begin(), memoryBlocks.end(),
         [&](const Block& block) {
-            return block.process == process;
+             return block.process && block.process->getPID() == pid;
         }), memoryBlocks.end());
 }
 
@@ -51,7 +53,8 @@ int MemoryManager::getNumProcessesInMemory() const {
             unique.insert(block.process);
     }
     
-    return static_cast<int>(memoryBlocks.size());
+    //return static_cast<int>(memoryBlocks.size());
+    return static_cast<int>(unique.size());
 }
 
 int MemoryManager::getExternalFragmentation() const {
