@@ -12,6 +12,14 @@ MemoryManager::MemoryManager(int totalMem, int frameSize, int memPerProcess)
     : totalMemory(totalMem), frameSize(frameSize), memoryPerProcess(memPerProcess) {}
 
 bool MemoryManager::allocate(std::shared_ptr<Process> process) {
+    //  this
+    for (const auto& block : memoryBlocks) {
+        if (block.process && block.process->getPID() == process->getPID()) {
+            return true; 
+        }
+    }
+    // this
+
     int needed = ((memoryPerProcess + frameSize - 1) / frameSize) * frameSize;
 
     // Sort blocks by start address
