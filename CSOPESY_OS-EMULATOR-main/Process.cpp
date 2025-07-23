@@ -1,7 +1,7 @@
 #include "Process.h"
 #include <iostream>
 #include <iomanip>
-#include <sstream> 
+#include <sstream>
 
 Process::Process(int pid, const std::string& name, int lines)
     : pid(pid), name(name), commandCounter(0), linesOfCode(lines),
@@ -18,7 +18,16 @@ void Process::executeNextInstruction(int coreID) {
     }
 
     if (commandCounter < linesOfCode && commandCounter < instructions.size()) {
-        instructions[commandCounter]->execute(name, coreID, variables, outputLog, sleeping, sleepTicks);
+
+        instructions[commandCounter]->execute(
+            name,
+            coreID,
+            variables,
+            outputLog,
+            sleeping,
+            sleepTicks,
+            memoryManager 
+        );
         commandCounter++;
     }
 
@@ -72,6 +81,11 @@ void Process::setInstructions(const std::vector<std::shared_ptr<Instruction>>& i
     instructions = insts;
 }
 
+
+void Process::setMemoryManager(const std::shared_ptr<MemoryManager>& memManager) {
+    memoryManager = memManager;
+}
+
 void Process::markFinished() {
     if (!hasFinishTime) {
         finishTime = std::chrono::system_clock::now();
@@ -86,4 +100,11 @@ std::string Process::getFinishTimeString() const {
     std::ostringstream oss;
     oss << std::put_time(&local_tm, "%H:%M:%S %m/%d/%Y");
     return oss.str();
+}
+
+Instruction* Process::getCurrentInstruction() const {
+    if (commandCounter < instructions.size()) {
+        return instructions[commandCounter].get();  // Return raw pointer from shared_ptr
+    }
+    return nullptr;
 }

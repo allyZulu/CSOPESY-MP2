@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <chrono>
 #include "Instruction.h"
+#include "MemoryManager.h"  // Required for memory-related execution
 
 class Process {
 public:
@@ -28,10 +29,12 @@ public:
     void setCoreID(int coreID);
     void setState(ProcessState newState);
     void setInstructions(const std::vector<std::shared_ptr<Instruction>>& insts);
+    void setMemoryManager(const std::shared_ptr<MemoryManager>& memManager); // ✅ Added
 
-    //for the finished time sa process
     std::string getFinishTimeString() const;
     void markFinished();
+
+    Instruction* getCurrentInstruction() const;
 
 private:
     int pid;
@@ -49,4 +52,6 @@ private:
     int sleepTicks = 0;
     std::chrono::system_clock::time_point finishTime;
     bool hasFinishTime = false;
+
+    std::shared_ptr<MemoryManager> memoryManager = nullptr; // ✅ Added
 };

@@ -10,7 +10,7 @@
 
 class Scheduler {
 public:
-    // Scheduler(int numCores, const std::string& algorithm, int quantum = 1, int delay = 0,
+    
     // int maxMemory = 16384, int frameSize = 16, int memoryPerProcess = 4096);
     Scheduler(int numCores, const std::string& algorithm, int quantum = 1, int delay = 0,
           MemoryManager* memoryManager = nullptr);

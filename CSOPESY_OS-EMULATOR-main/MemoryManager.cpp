@@ -1,127 +1,97 @@
 #include "MemoryManager.h"
-#include <sstream>
 #include <iostream>
-#include <algorithm>
-#include <unordered_set>
-#include <ctime>
-#include <chrono>
-#include <iomanip>
+#include <limits>
 
+MemoryManager::MemoryManager(int maxMem, int frameSize, int memPerProcess)
+    : maxMemory(maxMemory), frameSize(frameSize), memoryPerProcess(memPerProcess) {
+    totalFrames = maxMemory / frameSize;
+    frameTable.resize(totalFrames, -1);
+}
 
-MemoryManager::MemoryManager(int totalMem, int frameSize, int memPerProcess)
-    : totalMemory(totalMem), frameSize(frameSize), memoryPerProcess(memPerProcess) {}
+int MemoryManager::getFrameSize() const {
+    return frameSize;
+}
 
-bool MemoryManager::allocate(std::shared_ptr<Process> process) {
-    //  this
-    for (const auto& block : memoryBlocks) {
-        if (block.process && block.process->getPID() == process->getPID()) {
-            return true; 
+int MemoryManager::allocateMemory(int pid) {
+    // No-op in demand paging — memory is allocated per-page as needed
+    return 0;
+}
+
+void MemoryManager::deallocateMemory(int pid) {
+    for (int i = 0; i < totalFrames; ++i) {
+        if (frameTable[i] == pid) {
+            frameTable[i] = -1;
         }
     }
-    // this
+    processPages.erase(pid);
+    pageToFrame.erase(pid);
 
-    int needed = ((memoryPerProcess + frameSize - 1) / frameSize) * frameSize;
-
-    // Sort blocks by start address
-    std::sort(memoryBlocks.begin(), memoryBlocks.end(), [](const Block& a, const Block& b) {
-        return a.start < b.start;
-    });
-
-    int lastEnd = 0;
-    for (auto& block : memoryBlocks) {
-        if (block.start - lastEnd >= needed) {
-            // Found a gap
-            memoryBlocks.push_back({ lastEnd, needed, process });
-            return true;
+    if (lruMap.count(pid)) {
+        for (auto& entry : lruMap[pid]) {
+            lruList.erase(entry.second);
         }
-        lastEnd = block.start + block.size;
+        lruMap.erase(pid);
     }
+}
 
-    if (totalMemory - lastEnd >= needed) {
-        memoryBlocks.push_back({ lastEnd, needed, process });
+int MemoryManager::getFreeFrame() {
+    for (int i = 0; i < totalFrames; ++i) {
+        if (frameTable[i] == -1) return i;
+    }
+    return -1; // No free frame
+}
+
+void MemoryManager::evictPageLRU() {
+    if (lruList.empty()) return;
+
+    auto [evictPid, evictPage] = lruList.back();
+    lruList.pop_back();
+
+    int frameToFree = pageToFrame[evictPid][evictPage];
+    frameTable[frameToFree] = -1;
+    processPages[evictPid].erase(evictPage);
+    pageToFrame[evictPid][evictPage] = -1;
+    lruMap[evictPid].erase(evictPage);
+}
+
+void MemoryManager::updateLRU(int pid, int pageNumber) {
+    if (lruMap[pid].count(pageNumber)) {
+        lruList.erase(lruMap[pid][pageNumber]);
+    }
+    lruList.push_front({pid, pageNumber});
+    lruMap[pid][pageNumber] = lruList.begin();
+}
+
+bool MemoryManager::ensurePageLoaded(int pid, int virtualAddress) {
+    int pageNumber = virtualAddress / frameSize;
+
+    if (processPages[pid].count(pageNumber)) {
+        updateLRU(pid, pageNumber);
         return true;
     }
 
-    return false; // No space
-}
-
-void MemoryManager::deallocate(std::shared_ptr<Process> process) {
-    int pid = process->getPID();  // Get process ID for comparison
-
-    memoryBlocks.erase(std::remove_if(memoryBlocks.begin(), memoryBlocks.end(),
-        [&](const Block& block) {
-             return block.process && block.process->getPID() == pid;
-        }), memoryBlocks.end());
-}
-
-int MemoryManager::getNumProcessesInMemory() const {
-    std::unordered_set<std::shared_ptr<Process>> unique;
-    for (const auto& block : memoryBlocks) {
-        if (block.process)
-            unique.insert(block.process);
-    }
-    
-    //return static_cast<int>(memoryBlocks.size());
-    return static_cast<int>(unique.size());
-}
-
-int MemoryManager::getExternalFragmentation() const {
-    int externalFrag = 0;
-    int lastEnd = 0;
-
-    std::vector<Block> sorted = memoryBlocks;
-    std::sort(sorted.begin(), sorted.end(), [](const Block& a, const Block& b) {
-        return a.start < b.start;
-    });
-
-    for (const auto& block : sorted) {
-        if (block.start > lastEnd) {
-            externalFrag += (block.start - lastEnd);
+    int frame = getFreeFrame();
+    if (frame == -1) {
+        evictPageLRU();
+        frame = getFreeFrame();
+        if (frame == -1) {
+            std::cerr << "Failed to load page for PID " << pid << " - Out of memory\n";
+            return false;
         }
-        lastEnd = block.start + block.size;
     }
 
-    if (lastEnd < totalMemory) {
-        externalFrag += (totalMemory - lastEnd);
-    }
-
-    return externalFrag / 1024;
+    frameTable[frame] = pid;
+    processPages[pid].insert(pageNumber);
+    if (pageToFrame[pid].size() <= pageNumber)
+        pageToFrame[pid].resize(pageNumber + 1, -1);
+    pageToFrame[pid][pageNumber] = frame;
+    updateLRU(pid, pageNumber);
+    return true;
 }
 
-std::string MemoryManager::getTimestamp() const {
-    auto now = std::chrono::system_clock::now();
-    std::time_t t = std::chrono::system_clock::to_time_t(now);
-    std::tm tm = *std::localtime(&t);
-
-    std::ostringstream oss;
-    oss << "(" << std::put_time(&tm, "%m/%d/%Y %I:%M:%S%p") << ")";
-    return oss.str();
-}
-
-void MemoryManager::snapshot(int quantumCycle) {
-    std::ostringstream filename;
-    filename << "memory_stamp_" << quantumCycle << ".txt";
-    std::ofstream out(filename.str());
-
-    if (!out.is_open()) return;
-
-    out << "Timestamp: " << getTimestamp() << "\n";
-    out << "Number of processes in memory: " << getNumProcessesInMemory() << "\n";
-    out << "Total external fragmentation in KB: " << getExternalFragmentation() << "\n\n";
-
-    out << "----end---- = " << totalMemory << "\n";
-
-    std::vector<Block> sorted = memoryBlocks;
-    std::sort(sorted.begin(), sorted.end(), [](const Block& a, const Block& b) {
-        return a.start > b.start;
-    });
-
-    for (const auto& block : sorted) {
-        out << block.start + block.size << "\n";
-        out << block.process->getName() << "\n";
-        out << block.start << "\n\n";
-    }
-
-    out << "----start---- = 0\n";
-    out.close();
+int MemoryManager::getFrameFromVirtualAddress(int pid, int virtualAddress) {
+    int pageNumber = virtualAddress / frameSize;
+    if (pageToFrame.count(pid) && pageToFrame[pid].size() > pageNumber)
+        return pageToFrame[pid][pageNumber];
+    return -1;
 }

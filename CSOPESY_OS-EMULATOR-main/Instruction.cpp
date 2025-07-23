@@ -1,6 +1,7 @@
 // Instruction.cpp - Contains instruction subclasses
 
 #include "Instruction.h"
+#include "MemoryManager.h"
 #include <sstream>
 #include <iostream>
 #include <algorithm>
@@ -21,10 +22,11 @@ public:
         std::unordered_map<std::string, uint16_t>& variables,
         std::string& outputLog,
         bool& sleeping,
-        int& sleepTicks
-    ) override {
-        variables[var] = value;
-    }
+        int& sleepTicks,
+        std::shared_ptr<MemoryManager> memoryManager);
+    // ) override {
+    //     variables[var] = value;
+    // }
 };
 
 class AddInstruction : public Instruction {
@@ -47,12 +49,9 @@ public:
         std::unordered_map<std::string, uint16_t>& variables,
         std::string& outputLog,
         bool& sleeping,
-        int& sleepTicks
-    ) override {
-        uint16_t v1 = variables[op1];
-        uint16_t v2 = isOp2Value ? value2 : variables[op2];
-        variables[dest] = v1 + v2;
-    }
+        int& sleepTicks,
+        std::shared_ptr<MemoryManager> memoryManager);
+
 };
 
 class SubtractInstruction : public Instruction {
@@ -75,12 +74,9 @@ public:
         std::unordered_map<std::string, uint16_t>& variables,
         std::string& outputLog,
         bool& sleeping,
-        int& sleepTicks
-    ) override {
-        uint16_t v1 = variables[op1];
-        uint16_t v2 = isOp2Value ? value2 : variables[op2];
-        variables[dest] = v1 - v2;
-    }
+        int& sleepTicks,
+        std::shared_ptr<MemoryManager> memoryManager);
+ 
 };
 
 class SleepInstruction : public Instruction {
@@ -95,9 +91,22 @@ public:
         std::unordered_map<std::string, uint16_t>& variables,
         std::string& outputLog,
         bool& sleeping,
-        int& sleepTicks
-    ) override {
-        sleeping = true;
-        sleepTicks = ticks;
-    }
+        int& sleepTicks,
+        std::shared_ptr<MemoryManager> memoryManager);
+
 };
+
+Instruction::Instruction(const std::string& line) : content(line) {
+    std::istringstream iss(line);
+    iss >> type;
+
+    // A simple heuristic to assign a virtual address for memory access simulation
+    std::string var;
+    if (type == "DECLARE" || type == "WRITE" || type == "READ") {
+        iss >> var;
+        if (!var.empty()) {
+            // Map variable name to a fake address (hashing approach)
+            virtualAddress = std::hash<std::string>{}(var) % 4096; // Clamp to per-process space
+        }
+    }
+}

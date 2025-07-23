@@ -2,13 +2,6 @@
 #include <iostream>
 #include <cstdint>
 
-// Scheduler::Scheduler(int numCores, const std::string& algorithm, int quantum, int delay, 
-//     int maxMemory = 16384, int frameSize = 16, int memoryPerProcess = 4096)
-//     : numCores(numCores), schedulingAlgorithm(algorithm), quantum(quantum), isRunning(true), delayPerExec(delay)
-//     {
-//     cores.resize(numCores);
-//     memoryManager = std::make_shared<MemoryManager>(maxMemory, frameSize, memoryPerProcess);
-// }
 
 Scheduler::Scheduler(int numCores, const std::string& algorithm, int quantum, int delay, 
                      MemoryManager* memoryManagerPtr)
@@ -22,12 +15,14 @@ Scheduler::Scheduler(int numCores, const std::string& algorithm, int quantum, in
 void Scheduler::addProcess(std::shared_ptr<Process> process) {
     // process->setState(Process::READY);
     // readyQueue.push(process);
-    if (memoryManager->allocate(process)) {
+    if (memoryManager->allocateMemory(process->getPID()) == 0) {
         process->setState(Process::READY);
         readyQueue.push(process);
-    } else {
+    }
+    else {
         // Re-queue if memory full
         readyQueue.push(process);
+        //std::cout << "Insufficient memory for process " << process->getName() << "\n";
     }
 }
 
@@ -40,28 +35,49 @@ void Scheduler::tick() {
 void Scheduler::assignProcessesToCores() {
     for (int i = 0; i < numCores; ++i) {
         auto& core = cores[i];
-        if (!core.currentProcess || core.currentProcess->isFinished()) {
-            if (core.currentProcess && core.currentProcess->isFinished()) {
+
+        // If the core has a process and finished, deallocate memory
+        if (core.currentProcess) {
+            if (core.currentProcess->isFinished()) {
+                memoryManager->deallocateMemory(core.currentProcess -> getPID());
                 core.currentProcess->setState(Process::FINISHED);
                 core.currentProcess = nullptr;
             }
+        }
 
-            if (!readyQueue.empty()) {
+        // If the core  empty assign a process 
+        if (!core.currentProcess) {
+            int queueSize = readyQueue.size(); // avoid infinite loop
+            for (int attempt = 0; attempt < queueSize; ++attempt) {
                 auto nextProcess = readyQueue.front();
                 readyQueue.pop();
+
+                // Memory is already allocated in demand paging — proceed directly
                 nextProcess->setCoreID(i);
                 nextProcess->setState(Process::RUNNING);
                 core.currentProcess = nextProcess;
                 core.remainingQuantum = quantum;
+                break;
             }
         }
     }
 }
+ 
 
 void Scheduler::executeProcesses() {
     for (int i = 0; i < numCores; ++i) {
         auto& core = cores[i];
         if (core.currentProcess && !core.currentProcess->isFinished()) {
+            auto pid = core.currentProcess->getPID();
+            auto instr = core.currentProcess->getCurrentInstruction();
+
+            // Demand paging: ensure page is loaded
+            if (instr && !memoryManager->ensurePageLoaded(pid, instr->virtualAddress)) {
+                std::cerr << "Page fault: PID " << pid << " could not load page for address "
+                          << instr->virtualAddress << "\n";
+                continue;
+            }
+
             core.currentProcess->executeNextInstruction(i);
 
             if(delayPerExec > 0){
@@ -84,9 +100,6 @@ void Scheduler::executeProcesses() {
             }
         }
     }
-
-    currentQuantumCycle++;
-    memoryManager->snapshot(currentQuantumCycle);
 }
 
 void Scheduler::stop() {
