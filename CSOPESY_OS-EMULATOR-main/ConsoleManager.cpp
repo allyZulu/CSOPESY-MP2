@@ -211,6 +211,10 @@ void ConsoleManager::stopScheduler() {
     std::cout << "Stopping automatic process generation...\n";
     generating = false;
 
+     // new
+    ticking = false; // di na gagawa ng instructions 
+     // new
+
     std::cout << "No new processes will be auto-generated. Scheduler is still running.\n";
 }
 

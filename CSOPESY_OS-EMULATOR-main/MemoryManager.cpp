@@ -1,11 +1,15 @@
 #include "MemoryManager.h"
 #include <iostream>
 #include <limits>
+#include <unordered_set>
 
-MemoryManager::MemoryManager(int maxMem, int frameSize, int memPerProcess)
+// added new: int isntructionSize -  size of a single instruction (in bytes)
+MemoryManager::MemoryManager(int maxMem, int frameSize, int memPerProcess, int instructionSize)
     : maxMemory(maxMemory), frameSize(frameSize), memoryPerProcess(memPerProcess) {
     totalFrames = maxMemory / frameSize;
     frameTable.resize(totalFrames, -1);
+    // new alculates how many instructions can fit into one memory page (or frame)
+    instructionsPerPage = frameSize / instructionSize;
 }
 
 int MemoryManager::getFrameSize() const {
@@ -69,6 +73,13 @@ bool MemoryManager::ensurePageLoaded(int pid, int virtualAddress) {
         updateLRU(pid, pageNumber);
         return true;
     }
+    
+    // new checks if the requested page for a process exists in the backing store
+    if (!backingStore[pid].count(pageNumber)) {
+        std::cerr << "Page not in backing store: PID " << pid << ", Page " << pageNumber << "\n";
+        return false;
+    }
+    // new
 
     int frame = getFreeFrame();
     if (frame == -1) {
@@ -95,3 +106,30 @@ int MemoryManager::getFrameFromVirtualAddress(int pid, int virtualAddress) {
         return pageToFrame[pid][pageNumber];
     return -1;
 }
+
+// new print the current state of memory, specifically showing which frames are free or occupied and by which PID (process ID).
+void MemoryManager::printMemoryState() {
+    std::cout << "Frame Table:\n";
+    for (int i = 0; i < frameTable.size(); ++i) {
+        std::cout << "Frame " << i << ": ";
+        if (frameTable[i] == -1) std::cout << "Free\n";
+        else std::cout << "PID " << frameTable[i] << "\n";
+    }
+}
+ // new
+
+
+// new: Prepares all valid pages of a process (instructions + symbol table) in the backing store
+void MemoryManager::registerProcess(int pid, int instructionCount) {
+    const int SYMBOL_TABLE_PAGES = 1;
+    int instructionPages = (instructionCount + instructionsPerPage - 1) / instructionsPerPage;
+    int totalPages = instructionPages + SYMBOL_TABLE_PAGES;
+
+    for (int i = 0; i < totalPages; ++i) {
+        backingStore[pid].insert(i);  // These pages are available
+    }
+
+}
+ // new
+
+
