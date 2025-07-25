@@ -126,4 +126,11 @@ int Process::getCurrentPageNumber() const {
     const int instructionsPerPage = memoryManager->getInstructionsPerPage(); // or define it as constant
     return commandCounter / instructionsPerPage;
 }
+
+
+const std::vector<std::shared_ptr<Instruction>>& Process::getInstructions() const {
+    return instructions;
+}
+
+
 //new

@@ -8,6 +8,7 @@
 #include <chrono>
 #include <cstdlib>
 #include <random>
+#include <string>
 
 
 const int cpuCycleTicks = 100; //constant ticks ng CPU
@@ -57,11 +58,14 @@ void Option2() {
     std::cout << "- exit" << std::endl;
 }
 
+bool isPowerOfTwo(int n) {
+    return n > 0 && (n & (n - 1)) == 0;
+}
+
 void ConsoleManager::run() {
     std::string input;
     headerprnt();
     Option1(); 
- //   std::cout << "Welcome to the OS Emulator Shell\n";
 
     while (true) {
         std::cout << "\nRoot:\\> ";
@@ -79,7 +83,16 @@ void ConsoleManager::run() {
         } else if (input == "screen -ls") {
             listScreens();
         } else if (input.rfind("screen -s ", 0) == 0) {
-            std::string name = input.substr(10);
+            //new --> Allows memory size input per spec, checks power-of-two & range.
+            std::istringstream iss(input.substr(10));
+            std::string name;
+            iss >> name;
+            std::string name; uint32_t memSize;
+            if (!(iss >> name >> memSize) || !isPowerOfTwo(memSize) || memSize < 26 || memSize > 65536) {
+                std::cout << "invalid memory allocation\n";
+                continue;
+            }
+            //new
             screenAttach(name);
         } else if (input.rfind("screen -r ", 0) == 0) {
             std::string name = input.substr(10);
@@ -90,6 +103,13 @@ void ConsoleManager::run() {
             stopScheduler();
         } else if (input == "report-util") {
             generateReport();
+        //new
+        } else if(input.rfind("screen -c ", 0) == 0){
+            //parse: name, memSize, instructions string in quotes
+            //Enables screen‑c command per spec with custom instructions.
+            std::string name = input.substr(10);
+            screenCustom(name);
+        //new
         } else {
             std::cout << "Unknown command.\n";
         }
@@ -99,7 +119,10 @@ void ConsoleManager::run() {
 
 void ConsoleManager::initialize() {
     loadConfig();
-    memoryManager = std::make_unique<MemoryManager>(maxOverallMem, memPerFrame, memPerProc);
+    //new
+    int instructionSize = 4; //fixed mem ng mga instructions
+    memoryManager = std::make_unique<MemoryManager>(maxOverallMem, memPerFrame, memPerProc, instructionSize);
+    //new
     isInitialized = true;
     std::cout << "System initialized successfully.\n";
 }
@@ -173,7 +196,7 @@ void ConsoleManager::startScheduler() {
             scheduler->tick();
             quantumCounter++;
             if(quantumCounter % quantumCycles == 0){
-                memoryManager->snapshot(quantumCounter); //snap shot every quantum cycle only 
+               // memoryManager->snapshot(quantumCounter); //snap shot every quantum cycle only 
             }  
             std::this_thread::sleep_for(std::chrono::milliseconds(cpuCycleTicks));
         }
@@ -221,6 +244,7 @@ void ConsoleManager::stopScheduler() {
 void ConsoleManager::createProcess(const std::string& name, int instructionCount, bool silent) {
    auto proc = std::make_shared<Process>(++currentPID, name, instructionCount);
 
+
     // Generate dummy instructions
     std::vector<std::shared_ptr<Instruction>> insts;
     for (int i = 0; i < instructionCount; ++i) {
@@ -238,10 +262,94 @@ void ConsoleManager::createProcess(const std::string& name, int instructionCount
 
     processTable[name] = proc;
     allProcesses.push_back(proc);
+
+    //new
+    int instructionSize = 4;
+    int totalBytes = instructionCount * instructionSize;
+    int frameSize = memoryManager->getFrameSize();
+    int totalPages = (totalBytes + frameSize - 1) / frameSize;
+
+    memoryManager->registerProcess(proc->getPID(), totalPages);
+
+    if(!memoryManager->allocateMemory(proc)){
+            std::cout << "Insufficient memory for process " << name << "\n";
+            return; // Don't create process
+    }
+   //new
+
     if(silent){
         std::cout << "Process " << name << " created with " << instructionCount << " instructions.\n";
     }
 }
+
+//new
+void ConsoleManager::screenCustom(const std::string& name) {
+    std::vector<std::shared_ptr<Instruction>> insts;
+    std::string line;
+
+    std::cout << "Creating custom process: " << name << "\n";
+    std::cout << "Enter instructions one by one (type 'done' to finish):\n";
+
+    while (true) {
+        std::cout << "> ";
+        std::getline(std::cin, line);
+
+        if (line == "done") break;
+
+        std::istringstream iss(line);
+        std::string cmd;
+        iss >> cmd;
+
+        if (cmd == "PRINT") {
+            std::string msg;
+            std::getline(iss, msg);
+            insts.push_back(std::make_shared<PrintInstruction>(msg));
+        } else if (cmd == "DECLARE") {
+            std::string var;
+            int val;
+            iss >> var >> val;
+            insts.push_back(std::make_shared<DeclareInstruction>(var, val));
+        } else if (cmd == "ADD") {
+            std::string dest, src1, src2;
+            iss >> dest >> src1 >> src2;
+            insts.push_back(std::make_shared<AddInstruction>(dest, src1, src2));
+        } else if (cmd == "SUBTRACT") {
+            std::string dest, src1, src2;
+            iss >> dest >> src1 >> src2;
+            insts.push_back(std::make_shared<SubtractInstruction>(dest, src1, src2));
+        } else {
+            std::cout << "Unknown instruction format.\n";
+        }
+    }
+
+    auto proc = std::make_shared<Process>(++currentPID, name, insts.size());
+    proc->setInstructions(insts);
+
+    // === MEMORY REGISTRATION AND ALLOCATION ===
+    int instructionSize = 4;
+    int totalBytes = insts.size() * instructionSize;
+    int frameSize = memoryManager->getFrameSize();
+    int totalPages = (totalBytes + frameSize - 1) / frameSize;
+
+    memoryManager->registerProcess(proc->getPID(), totalPages);
+
+    if (!memoryManager->allocateMemory(proc)) {
+        std::cout << "Insufficient memory for process " << name << "\n";
+        return;
+    }
+
+    processTable[name] = proc;
+    allProcesses.push_back(proc);
+
+    if (scheduler) {
+        scheduler->addProcess(proc);
+    } else {
+        std::cout << "Scheduler not running. Process idle.\n";
+    }
+
+    processScreen(proc);
+}
+//new
 
 //screen -ls (show ongoing and finished processes)
 void ConsoleManager::listScreens() {
@@ -283,11 +391,7 @@ void ConsoleManager::listScreens() {
     if (!anyShown) {
         std::cout << "  No active processes.\n";
     }
-    // for (auto& pair : processTable) {
-    //     if (!pair.second->isFinished()) {
-    //         std::cout << "  " << pair.first << "\n";
-    //     }
-    // }
+ 
 
     std::cout << "\n=== Finished Processes ===\n";
     bool anyFinished = false;
@@ -308,12 +412,20 @@ void ConsoleManager::listScreens() {
     }
 }
 
+
 // screen -s make process 
 void ConsoleManager::screenAttach(const std::string& name) {
     // If process does not exist, create it
     if (processTable.count(name) == 0) {
         int instructionCount = minInstructions + (rand() % (maxInstructions - minInstructions + 1));
         createProcess(name, instructionCount, true);
+
+        //new
+        if (processTable.find(name) == processTable.end()) {
+            // Process creation failed due to memory
+            return;
+        }
+        //new
 
         if (scheduler) {
             scheduler->addProcess(processTable[name]);

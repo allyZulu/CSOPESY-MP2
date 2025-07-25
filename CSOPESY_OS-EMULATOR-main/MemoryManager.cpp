@@ -16,26 +16,41 @@ int MemoryManager::getFrameSize() const {
     return frameSize;
 }
 
-int MemoryManager::allocateMemory(int pid) {
+bool MemoryManager::allocateMemory(std::shared_ptr<Process> proc) {
     // No-op in demand paging — memory is allocated per-page as needed
-    return 0;
+    //new
+    int pid = proc->getPID();
+    int instrCount = proc->getInstructions().size();
+    int totalPages = (instrCount + instructionsPerPage - 1) / instructionsPerPage;
+
+    if (totalPages * frameSize > memoryPerProcess) return false;
+
+    processTotalPages[pid] = totalPages;
+    pageTables[pid] = std::unordered_map<int, PageTableEntry>();
+    backingStore[pid] = std::unordered_set<int>();
+    registerProcess(pid, totalPages);
+    return true;
+    //new
 }
 
-void MemoryManager::deallocateMemory(int pid) {
-    for (int i = 0; i < totalFrames; ++i) {
-        if (frameTable[i] == pid) {
-            frameTable[i] = -1;
+void MemoryManager::deallocateMemory(std::shared_ptr<Process> process) {
+   //new
+   int pid = process->getPID();
+    if (pageTables.find(pid) != pageTables.end()) {
+        for (auto& entry : pageTables[pid]) {
+            int page = entry.first;
+            if (entry.second.valid && entry.second.frameNumber != -1) {
+                frameTable[entry.second.frameNumber] = false;
+            }
         }
     }
+    pageTables.erase(pid);
+    backingStore.erase(pid);
     processPages.erase(pid);
     pageToFrame.erase(pid);
-
-    if (lruMap.count(pid)) {
-        for (auto& entry : lruMap[pid]) {
-            lruList.erase(entry.second);
-        }
-        lruMap.erase(pid);
-    }
+    lruMap.erase(pid);
+    processTotalPages.erase(pid);
+   //new
 }
 
 int MemoryManager::getFreeFrame() {
@@ -48,14 +63,17 @@ int MemoryManager::getFreeFrame() {
 void MemoryManager::evictPageLRU() {
     if (lruList.empty()) return;
 
-    auto [evictPid, evictPage] = lruList.back();
+    auto evict = lruList.back();
     lruList.pop_back();
 
-    int frameToFree = pageToFrame[evictPid][evictPage];
-    frameTable[frameToFree] = -1;
-    processPages[evictPid].erase(evictPage);
-    pageToFrame[evictPid][evictPage] = -1;
-    lruMap[evictPid].erase(evictPage);
+    int pid = evict.first;
+    int pageNumber = evict.second;
+    if (pageTables[pid][pageNumber].valid) {
+        int frame = pageTables[pid][pageNumber].frameNumber;
+        frameTable[frame] = false;
+        pageTables[pid][pageNumber] = {-1, false, 0};
+        lruMap[pid].erase(pageNumber);
+    }
 }
 
 void MemoryManager::updateLRU(int pid, int pageNumber) {
@@ -67,44 +85,72 @@ void MemoryManager::updateLRU(int pid, int pageNumber) {
 }
 
 bool MemoryManager::ensurePageLoaded(int pid, int virtualAddress) {
-    int pageNumber = virtualAddress / frameSize;
-
-    if (processPages[pid].count(pageNumber)) {
-        updateLRU(pid, pageNumber);
+    //neww
+    int pageNumber = virtualAddress / instructionsPerPage;
+    if (pageTables[pid][pageNumber].valid) {
+        accessPage(pid, pageNumber);
         return true;
     }
-    
-    // new checks if the requested page for a process exists in the backing store
-    if (!backingStore[pid].count(pageNumber)) {
-        std::cerr << "Page not in backing store: PID " << pid << ", Page " << pageNumber << "\n";
-        return false;
-    }
-    // new
 
     int frame = getFreeFrame();
     if (frame == -1) {
         evictPageLRU();
         frame = getFreeFrame();
-        if (frame == -1) {
-            std::cerr << "Failed to load page for PID " << pid << " - Out of memory\n";
-            return false;
-        }
+        if (frame == -1) return false;
     }
 
-    frameTable[frame] = pid;
-    processPages[pid].insert(pageNumber);
-    if (pageToFrame[pid].size() <= pageNumber)
-        pageToFrame[pid].resize(pageNumber + 1, -1);
-    pageToFrame[pid][pageNumber] = frame;
+    frameTable[frame] = true;
+    pageTables[pid][pageNumber] = {frame, true, 0};
+    backingStore[pid].insert(pageNumber);
     updateLRU(pid, pageNumber);
     return true;
+    //new
 }
 
+//new
+void MemoryManager::accessPage(int pid, int pageNumber) {
+    updateLRU(pid, pageNumber);
+}
+
+void MemoryManager::printVMStat() const {
+    std::cout << "\n=== VMSTAT ===\n";
+    std::cout << "Total Frames: " << totalFrames << "\n";
+
+    int used = 0;
+    int free = 0;
+    for (size_t i = 0; i < frameTable.size(); ++i) {
+        if (frameTable[i])
+            used++;
+        else
+            free++;
+    }
+
+    std::cout << "Used Frames: " << used << "\n";
+    std::cout << "Free Frames: " << (totalFrames - used) << "\n";
+
+    std::cout << "\nProcess Page Tables:\n";
+    for (const auto& entry : pageTables) {
+        int pid = entry.first;
+        const auto& pageMap = entry.second;
+
+        std::cout << "PID " << pid << ": ";
+        for (const auto& pagePair : pageMap) {
+            int frame = pagePair.second.frameNumber;
+            std::cout << frame << " ";
+        }
+        std::cout << "\n";
+    }
+
+    std::cout << "=================\n";
+}
+//new
+
 int MemoryManager::getFrameFromVirtualAddress(int pid, int virtualAddress) {
-    int pageNumber = virtualAddress / frameSize;
-    if (pageToFrame.count(pid) && pageToFrame[pid].size() > pageNumber)
-        return pageToFrame[pid][pageNumber];
-    return -1;
+    //new
+    int pageNumber = virtualAddress / instructionsPerPage;
+    if (!pageTables[pid][pageNumber].valid) return -1;
+    return pageTables[pid][pageNumber].frameNumber;
+    //new
 }
 
 // new print the current state of memory, specifically showing which frames are free or occupied and by which PID (process ID).

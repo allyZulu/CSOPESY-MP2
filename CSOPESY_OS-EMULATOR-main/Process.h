@@ -38,6 +38,7 @@ public:
 
     //new
     int getCurrentPageNumber() const; 
+    const std::vector<std::shared_ptr<Instruction>>& getInstructions() const;
     //new
 
 private:

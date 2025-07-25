@@ -14,16 +14,15 @@ Scheduler::Scheduler(int numCores, const std::string& algorithm, int quantum, in
 
 void Scheduler::addProcess(std::shared_ptr<Process> process) {
     // process->setState(Process::READY);
-    // readyQueue.push(process);
-    if (memoryManager->allocateMemory(process->getPID()) == 0) {
+    //new
+    int result = memoryManager->allocateMemory(process);
+    if (result == 0) {
         process->setState(Process::READY);
         readyQueue.push(process);
+    } else {
+        std::cerr << "Memory allocation failed for PID " << process->getPID() << "\n";
     }
-    else {
-        // Re-queue if memory full
-        readyQueue.push(process);
-        //std::cout << "Insufficient memory for process " << process->getName() << "\n";
-    }
+    //new
 }
 
 void Scheduler::tick() {
@@ -39,7 +38,7 @@ void Scheduler::assignProcessesToCores() {
         // If the core has a process and finished, deallocate memory
         if (core.currentProcess) {
             if (core.currentProcess->isFinished()) {
-                memoryManager->deallocateMemory(core.currentProcess -> getPID());
+                memoryManager->deallocateMemory(core.currentProcess);
                 core.currentProcess->setState(Process::FINISHED);
                 core.currentProcess = nullptr;
             }

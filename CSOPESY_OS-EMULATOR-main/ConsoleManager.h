@@ -25,6 +25,9 @@ public:
     void generateReport(); // report-util
     int getCurrentPID() const;
     void printConfig() const;
+    //new
+    void screenCustom(const std::string& name);
+    //new
 
 private:
     ConsoleManager();

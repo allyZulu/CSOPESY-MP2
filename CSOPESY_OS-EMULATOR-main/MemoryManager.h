@@ -37,18 +37,22 @@ public:
     // mew : int instructionSize
     MemoryManager(int maxMem, int frameSize, int memPerProcess, int instructionSize); 
 
-    int allocateMemory(int pid); // allocates memory for process (returns base frame)
-    void deallocateMemory(int pid);
+    bool allocateMemory(std::shared_ptr<Process> proc); // allocates memory for process (returns base frame)
+    void deallocateMemory(std::shared_ptr<Process> process);
     bool ensurePageLoaded(int pid, int virtualAddress);
     void accessPage(int pid, int pageNumber); // triggers LRU update
 
     int getFrameFromVirtualAddress(int pid, int virtualAddress);
+
+
+
     int getFrameSize() const;
 
     // new
     void printMemoryState();
     void registerProcess(int pid, int totalPages);
     int getInstructionsPerPage() const;
+    void printVMStat() const;
     // new
 
 private:
