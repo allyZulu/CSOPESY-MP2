@@ -36,6 +36,10 @@ public:
 
     Instruction* getCurrentInstruction() const;
 
+    //new
+    int getCurrentPageNumber() const; 
+    //new
+
 private:
     int pid;
     std::string name;
@@ -47,6 +51,10 @@ private:
     std::vector<std::shared_ptr<Instruction>> instructions;
     std::unordered_map<std::string, uint16_t> variables;
     std::string outputLog;
+    //new
+    std::vector<PageTableEntry> pageTable;  // One entry per virtual page
+    
+    //new 
 
     bool sleeping = false;
     int sleepTicks = 0;

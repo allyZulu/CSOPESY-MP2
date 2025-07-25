@@ -116,10 +116,9 @@ void MemoryManager::printMemoryState() {
         else std::cout << "PID " << frameTable[i] << "\n";
     }
 }
- // new
 
 
-// new: Prepares all valid pages of a process (instructions + symbol table) in the backing store
+// Prepares all valid pages of a process (instructions + symbol table) in the backing store
 void MemoryManager::registerProcess(int pid, int instructionCount) {
     const int SYMBOL_TABLE_PAGES = 1;
     int instructionPages = (instructionCount + instructionsPerPage - 1) / instructionsPerPage;
@@ -128,7 +127,13 @@ void MemoryManager::registerProcess(int pid, int instructionCount) {
     for (int i = 0; i < totalPages; ++i) {
         backingStore[pid].insert(i);  // These pages are available
     }
+    processTotalPages[pid] = totalPages;  // Track for cleanup or diagnostics
 
+}
+
+// 
+int MemoryManager::getInstructionsPerPage() const {
+    return instructionsPerPage;
 }
  // new
 

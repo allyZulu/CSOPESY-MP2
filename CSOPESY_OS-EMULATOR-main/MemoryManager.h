@@ -18,9 +18,11 @@ struct PageInfo {
     int pageNumber;
 };
 
+// new
 struct PageTableEntry {
-    int frameNumber;
-    bool valid;
+    int frameNumber = -1;       // -1 if not in memory
+    bool valid = false;         // true if loaded into RAM
+    int lastUsedTick = 0;
 };
 
 struct FrameInfo {
@@ -28,7 +30,7 @@ struct FrameInfo {
     int pid = -1;
     int pageNumber = -1;
 };
-
+// new
 
 class MemoryManager {
 public:
@@ -46,6 +48,7 @@ public:
     // new
     void printMemoryState();
     void registerProcess(int pid, int totalPages);
+    int getInstructionsPerPage() const;
     // new
 
 private:
@@ -67,10 +70,6 @@ private:
     std::unordered_map<int, std::unordered_map<int, std::list<std::pair<int, int>>::iterator>> lruMap;
     std::unordered_map<int, std::unordered_map<int, PageTableEntry>> pageTables; // pid → (virtualPage → PageTableEntry)
   
-    // new
-    std::unordered_map<int, std::unordered_set<int>> backingStore; // pid → valid page numbers
-    // new
-
     // LRU
     std::list<std::pair<int, int>> lruList; // (pid, pageNumber)
    

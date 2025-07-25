@@ -16,7 +16,19 @@ void Process::executeNextInstruction(int coreID) {
         if (--sleepTicks <= 0) sleeping = false;
         return;
     }
+    //new
+    // calculates which page the current instruction belongs to
+    int currentPage = commandCounter / memoryManager->getInstructionsPerPage();
 
+    // Checks if the required page for this instruction is loaded 
+    if (!memoryManager->ensurePageLoaded(pid, currentPage)) {
+        std::cout << "[Page Fault] Process " << pid << " triggered loading of page "
+                  << currentPage << "\n";
+    }
+
+    // updates the Least Recently Used (LRU) tracking for that page
+    memoryManager->accessPage(pid, currentPage); // Mark page access for LRU
+    // new
     if (commandCounter < linesOfCode && commandCounter < instructions.size()) {
 
         instructions[commandCounter]->execute(
@@ -108,3 +120,10 @@ Instruction* Process::getCurrentInstruction() const {
     }
     return nullptr;
 }
+
+//new
+int Process::getCurrentPageNumber() const {
+    const int instructionsPerPage = memoryManager->getInstructionsPerPage(); // or define it as constant
+    return commandCounter / instructionsPerPage;
+}
+//new
