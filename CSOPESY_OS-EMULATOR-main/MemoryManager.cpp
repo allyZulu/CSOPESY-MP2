@@ -214,7 +214,7 @@ int MemoryManager::getInstructionsPerPage() const {
 }
  // new
 
- //newest
+ //newest checks if an address is valid for a given process.
  bool MemoryManager::isAddressValid(int pid, int virtualAddress) {
     if (processTotalPages.find(pid) == processTotalPages.end()) return false;
     int totalPages = processTotalPages[pid];

@@ -125,8 +125,8 @@ public:
         variables[dest] = v1 - v2;
     }
 };
-
-lass ReadInstruction : public Instruction {
+// newest
+class ReadInstruction : public Instruction {
     std::string var;
     int address;
 
