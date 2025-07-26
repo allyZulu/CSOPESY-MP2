@@ -7,7 +7,7 @@
 MemoryManager::MemoryManager(int maxMem, int frameSize, int memPerProcess, int instructionSize)
     : maxMemory(maxMemory), frameSize(frameSize), memoryPerProcess(memPerProcess) {
     totalFrames = maxMemory / frameSize;
-    frameTable.resize(totalFrames, -1);
+    frameTable.resize(totalFrames); //newest cause each entry is in FrameInfo na
     // new alculates how many instructions can fit into one memory page (or frame)
     instructionsPerPage = frameSize / instructionSize;
 }
@@ -16,36 +16,67 @@ int MemoryManager::getFrameSize() const {
     return frameSize;
 }
 
+//newest: removed registerProcess(pid, totalPages); kasi redundant na
 bool MemoryManager::allocateMemory(std::shared_ptr<Process> proc) {
     // No-op in demand paging — memory is allocated per-page as needed
     //new
     int pid = proc->getPID();
     int instrCount = proc->getInstructions().size();
-    int totalPages = (instrCount + instructionsPerPage - 1) / instructionsPerPage;
+   
+    int instructionPages = (instrCount + instructionsPerPage - 1) / instructionsPerPage; // How many pages are needed for instructions
+    int totalPages = instructionPages + 1; // +1 page for the symbol table
 
-    if (totalPages * frameSize > memoryPerProcess) return false;
+    if (totalPages * frameSize > memoryPerProcess) return false; // Check per-process memory limit
 
     processTotalPages[pid] = totalPages;
     pageTables[pid] = std::unordered_map<int, PageTableEntry>();
     backingStore[pid] = std::unordered_set<int>();
-    registerProcess(pid, totalPages);
-    return true;
-    //new
-}
 
-void MemoryManager::deallocateMemory(std::shared_ptr<Process> process) {
-   //new
-   int pid = process->getPID();
-    if (pageTables.find(pid) != pageTables.end()) {
-        for (auto& entry : pageTables[pid]) {
-            int page = entry.first;
-            if (entry.second.valid && entry.second.frameNumber != -1) {
-                frameTable[entry.second.frameNumber] = false;
-            }
+    // === Allocate the symbol table page (page 0) first ===
+    int frame = getFreeFrame();
+    if (frame == -1) {
+        // No frame available, symbol table is not loaded yet
+        pageTables[pid][0] = {-1, false, 0};  
+        backingStore[pid].insert(0);
+    } else {
+        // Place symbol table in memory
+        frameTable[frame] = true;
+        pageTables[pid][0] = {frame, true, 0};
+        updateLRU(pid, 0);
+    }
+
+    // === Allocate instruction pages (pages 1..n) ===
+    for (int page = 1; page < totalPages; ++page) {
+        int frame = getFreeFrame();
+        if (frame == -1) {
+            // Not in memory yet, mark for backing store
+            pageTables[pid][page] = {-1, false, 0};
+            backingStore[pid].insert(page);
+        } else {
+            frameTable[frame] = true; 
+            pageTables[pid][page] = {frame, true, 0};
+            updateLRU(pid, page);
         }
     }
-    pageTables.erase(pid);
-    backingStore.erase(pid);
+    return true;
+}
+//newest
+
+// newest edited this one 
+void MemoryManager::deallocateMemory(std::shared_ptr<Process> process) {
+   //new
+   int pid = process->getPID();   // Check if the process has a page table
+    if (pageTables.find(pid) != pageTables.end()) {
+        for (auto& entry : pageTables[pid]) {
+            int frame = entry.second.frameNumber; 
+            if (entry.second.valid && entry.second.frameNumber != -1) {
+                frameTable[frame] = false; // mark frame as free 
+            }
+        }
+        pageTables.erase(pid);
+
+    }
+    backingStore.erase(pid); 
     processPages.erase(pid);
     pageToFrame.erase(pid);
     lruMap.erase(pid);
@@ -182,5 +213,15 @@ int MemoryManager::getInstructionsPerPage() const {
     return instructionsPerPage;
 }
  // new
+
+ //newest
+ bool MemoryManager::isAddressValid(int pid, int virtualAddress) {
+    if (processTotalPages.find(pid) == processTotalPages.end()) return false;
+    int totalPages = processTotalPages[pid];
+    int pageNumber = virtualAddress / instructionsPerPage;
+
+    return pageNumber >= 0 && pageNumber < totalPages;
+}
+
 
 

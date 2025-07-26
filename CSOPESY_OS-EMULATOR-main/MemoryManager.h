@@ -44,9 +44,8 @@ public:
 
     int getFrameFromVirtualAddress(int pid, int virtualAddress);
 
-
-
     int getFrameSize() const;
+    bool isAddressValid(int pid, int virtualAddress); // newest
 
     // new
     void printMemoryState();
