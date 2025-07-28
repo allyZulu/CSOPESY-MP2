@@ -60,6 +60,7 @@ private:
     int delayPerExec = 0;
     int maxOverallMem = 1024;   
     int memPerFrame = 64; 
-    int memPerProc = 128; 
+    int minMemPerProc = 64;     // default minimum 64 bytes
+    int maxMemPerProc = 65536;  // default maximum 64 KB 
 
 };

@@ -62,6 +62,11 @@ bool isPowerOfTwo(int n) {
     return n > 0 && (n & (n - 1)) == 0;
 }
 
+// newestest
+bool isValidMemSize(int size) {
+    return size >= 64 && size <= 65536 && isPowerOfTwo(size);
+} // newestest 
+
 void ConsoleManager::run() {
     std::string input;
     headerprnt();
@@ -85,11 +90,10 @@ void ConsoleManager::run() {
         } else if (input.rfind("screen -s ", 0) == 0) {
             //new --> Allows memory size input per spec, checks power-of-two & range.
             std::istringstream iss(input.substr(10));
-            std::string name;
-            iss >> name;
-            std::string name; uint32_t memSize;
-            if (!(iss >> name >> memSize) || !isPowerOfTwo(memSize) || memSize < 26 || memSize > 65536) {
-                std::cout << "invalid memory allocation\n";
+            std::string name; 
+            uint32_t memSize;
+            if (!(iss >> name >> memSize) || !isValidMemSize(memSize)) {
+                std::cout << "Invalid memory allocation.\n";
                 continue;
             }
             //new
@@ -107,8 +111,14 @@ void ConsoleManager::run() {
         } else if(input.rfind("screen -c ", 0) == 0){
             //parse: name, memSize, instructions string in quotes
             //Enables screen‑c command per spec with custom instructions.
-            std::string name = input.substr(10);
-            screenCustom(name);
+            std::istringstream iss(input.substr(10));
+            std::string name;
+            uint32_t memSize;
+            std::string instructions;
+            if (!isValidMemSize(memSize)) {
+                std::cout << "Invalid memory allocation.\n";
+                return;
+            }
         //new
         } else {
             std::cout << "Unknown command.\n";
@@ -121,7 +131,9 @@ void ConsoleManager::initialize() {
     loadConfig();
     //new
     int instructionSize = 4; //fixed mem ng mga instructions
-    memoryManager = std::make_unique<MemoryManager>(maxOverallMem, memPerFrame, memPerProc, instructionSize);
+     memoryManager = std::make_unique<MemoryManager>(
+        maxOverallMem, memPerFrame, maxMemPerProc, instructionSize                                             /// NALILITO AN AKO DITO LOLZ 
+    );
     //new
     isInitialized = true;
     std::cout << "System initialized successfully.\n";
@@ -131,13 +143,15 @@ void ConsoleManager::printConfig() const {
     std::cout << "=== Current Configuration ===\n";
     std::cout << "Number of CPUs: " << numCPU << "\n";
     std::cout << "Quantum Cycles: " << quantumCycles << "\n";
-    std::cout << "Batch Process Frequency: " << batchProcessFreq << "seconds\n";
+    std::cout << "Batch Process Frequency: " << batchProcessFreq << " seconds\n";
     std::cout << "Instruction Range: " << minInstructions << " - " << maxInstructions << "\n";
-    std::cout << "Delay per Execution: " << delayPerExec << "ms\n"; 
-    std::cout << "Max Overall Memory: " << maxOverallMem << "Bytes\n";
-    std::cout << "Memory per Frame: " << memPerFrame << "Bytes\n";
-    std::cout << "Memory per Process: " << memPerProc << "Bytes\n";
+    std::cout << "Delay per Execution: " << delayPerExec << " ms\n"; 
+    std::cout << "Max Overall Memory: " << maxOverallMem << " Bytes\n";
+    std::cout << "Memory per Frame: " << memPerFrame << " Bytes\n";
+    std::cout << "Min/Max Memory per Process: " << minMemPerProc 
+              << "/" << maxMemPerProc << " Bytes\n";
 }
+
 
 void ConsoleManager::loadConfig() {
     std::ifstream file("config.txt");
@@ -157,17 +171,22 @@ void ConsoleManager::loadConfig() {
         else if (key == "delay-per-exec") file >> delayPerExec;
         else if (key == "max-overall-mem") file >> maxOverallMem; 
         else if (key == "mem-per-frame") file >> memPerFrame;
-        else if (key == "mem-per-proc") file >> memPerProc;
+        else if (key == "min-mem-per-proc") file >> minMemPerProc;
+        else if (key == "max-mem-per-proc") file >> maxMemPerProc;
+
         else {
             std::cout << "Unknown config key: " << key << "\n";
         }
     }
 
     std::cout << "Config loaded: " << numCPU << " CPUs, Scheduler = " << schedulerAlgo
-              << ", Quantum = " << quantumCycles << ", Min/Max Instructions = "
-              << minInstructions << "/" << maxInstructions << ", Delay = " << delayPerExec << "\n" 
-              << "Max Overall Memory: " << maxOverallMem << "Bytes, Memory per Frame: " << memPerFrame
-              << "Bytes, Memory per Process: " << memPerProc << "Bytes\n";
+          << ", Quantum = " << quantumCycles
+          << ", Min/Max Instructions = " << minInstructions << "/" << maxInstructions
+          << ", Delay = " << delayPerExec << "ms\n"
+          << "Max Overall Memory: " << maxOverallMem << " Bytes, Memory per Frame: "
+          << memPerFrame << " Bytes\n"
+          << "Min/Max Memory per Process: " << minMemPerProc << "/" << maxMemPerProc << " Bytes\n";
+
 }
 
 void ConsoleManager::startScheduler() {
@@ -412,7 +431,7 @@ void ConsoleManager::listScreens() {
     }
 }
 
-
+//added memSize
 // screen -s make process 
 void ConsoleManager::screenAttach(const std::string& name) {
     // If process does not exist, create it
