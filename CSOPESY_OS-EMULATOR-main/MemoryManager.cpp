@@ -3,13 +3,12 @@
 #include <limits>
 #include <unordered_set>
 
-// added new: int isntructionSize -  size of a single instruction (in bytes)
-MemoryManager::MemoryManager(int maxMem, int frameSize, int memPerProcess, int instructionSize)
-    : maxMemory(maxMemory), frameSize(frameSize), memoryPerProcess(memPerProcess) {
+// updated memory manager constructor
+MemoryManager::MemoryManager(int maxMem, int frameSz, int memPerProc, int instructionSz)
+    : maxMemory(maxMem), frameSize(frameSz), memoryPerProcess(memPerProc) {
     totalFrames = maxMemory / frameSize;
-    frameTable.resize(totalFrames); //newest cause each entry is in FrameInfo na
-    // new alculates how many instructions can fit into one memory page (or frame)
-    instructionsPerPage = frameSize / instructionSize;
+    frameTable.resize(totalFrames, false);  // Ensure all entries are initialized
+    instructionsPerPage = frameSize / instructionSz;
 }
 
 int MemoryManager::getFrameSize() const {
