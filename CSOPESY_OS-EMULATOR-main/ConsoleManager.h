@@ -20,13 +20,13 @@ public:
     void stopScheduler();
     void createProcess(const std::string& name, int instructionCount, bool silent);
     void listScreens(); // screen -ls
-    void screenAttach(const std::string& name); // screen -s <name>
+    void screenAttach(const std::string& name, int memSize); // screen -s <name>
     void screenReattach(const std::string& name); // screen -r <name>
     void generateReport(); // report-util
     int getCurrentPID() const;
     void printConfig() const;
     //new
-    void screenCustom(const std::string& name);
+    void screenCustom(const std::string& name, uint32_t memSize, const std::string& instructionStr);
     //new
 
 private:

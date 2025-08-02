@@ -132,5 +132,12 @@ const std::vector<std::shared_ptr<Instruction>>& Process::getInstructions() cons
     return instructions;
 }
 
+void Process::setMemoryRequirement(int bytes) {
+    memoryRequirementBytes = bytes;
+}
+
+int Process::getMemoryRequirement() const {
+    return memoryRequirementBytes;
+}
 
 //new

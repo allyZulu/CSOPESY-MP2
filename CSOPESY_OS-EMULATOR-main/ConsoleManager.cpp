@@ -9,6 +9,8 @@
 #include <cstdlib>
 #include <random>
 #include <string>
+#include <algorithm>
+#include <cctype>
 
 
 const int cpuCycleTicks = 100; //constant ticks ng CPU
@@ -62,10 +64,26 @@ bool isPowerOfTwo(int n) {
     return n > 0 && (n & (n - 1)) == 0;
 }
 
-// newestest
+
 bool isValidMemSize(int size) {
     return size >= 64 && size <= 65536 && isPowerOfTwo(size);
-} // newestest 
+} 
+
+//New trim string
+std::string trim(const std::string& s) {
+    auto start = s.begin();
+    while (start != s.end() && std::isspace(*start)) {
+        ++start;
+    }
+
+    auto end = s.end();
+    do {
+        --end;
+    } while (std::distance(start, end) > 0 && std::isspace(*end));
+
+    return std::string(start, end + 1);
+}
+
 
 void ConsoleManager::run() {
     std::string input;
@@ -91,13 +109,13 @@ void ConsoleManager::run() {
             //new --> Allows memory size input per spec, checks power-of-two & range.
             std::istringstream iss(input.substr(10));
             std::string name; 
-            uint32_t memSize;
+            uint16_t memSize;
             if (!(iss >> name >> memSize) || !isValidMemSize(memSize)) {
                 std::cout << "Invalid memory allocation.\n";
                 continue;
             }
             //new
-            screenAttach(name);
+            screenAttach(name, memSize);
         } else if (input.rfind("screen -r ", 0) == 0) {
             std::string name = input.substr(10);
             screenReattach(name);
@@ -107,19 +125,35 @@ void ConsoleManager::run() {
             stopScheduler();
         } else if (input == "report-util") {
             generateReport();
-        //new
+        //new - screen -c
         } else if(input.rfind("screen -c ", 0) == 0){
             //parse: name, memSize, instructions string in quotes
             //Enables screen‑c command per spec with custom instructions.
             std::istringstream iss(input.substr(10));
             std::string name;
-            uint32_t memSize;
+            uint16_t memSize;
             std::string instructions;
+
+            iss >> name >> memSize;
+            std::getline(iss, instructions);
+            instructions = trim(instructions); //remove any leading and trailing spaces
             if (!isValidMemSize(memSize)) {
                 std::cout << "Invalid memory allocation.\n";
                 return;
             }
-        //new
+
+            screenCustom(name, memSize, instructions);
+
+        //new - vmstat 
+        } else if (input == "vmstat") {
+            if(!memoryManager){
+                std::cout << "Memory Manager not initialized.\n";
+            } else {
+                memoryManager->printVMStat();
+            }
+        // new - process-smi in main menu
+        } else if (input == "process-smi"){
+            memoryManager->printProcessSMI();
         } else {
             std::cout << "Unknown command.\n";
         }
@@ -132,7 +166,7 @@ void ConsoleManager::initialize() {
     //new
     int instructionSize = 4; //fixed mem ng mga instructions
      memoryManager = std::make_unique<MemoryManager>(
-        maxOverallMem, memPerFrame, maxMemPerProc, instructionSize                                             /// NALILITO AN AKO DITO LOLZ 
+        maxOverallMem, memPerFrame, maxMemPerProc, instructionSize   
     );
     //new
     isInitialized = true;
@@ -266,15 +300,51 @@ void ConsoleManager::createProcess(const std::string& name, int instructionCount
 
     // Generate dummy instructions
     std::vector<std::shared_ptr<Instruction>> insts;
+    int varCounter = 0;
+
     for (int i = 0; i < instructionCount; ++i) {
-        if (i % 4 == 0)
-            insts.push_back(std::make_shared<DeclareInstruction>("x", i));
-        else if (i % 4 == 1)
-            insts.push_back(std::make_shared<AddInstruction>("x", "x", "1"));
-        else if (i % 4 == 2)
-            insts.push_back(std::make_shared<SubtractInstruction>("x", "x", "1"));
-        else
-            insts.push_back(std::make_shared<PrintInstruction>("Instruction executed."));
+
+        int opcode = rand() % 6; //include read write as instructions
+        std::string varName = "v" + std::to_string(varCounter);
+
+        switch(opcode){
+            case 0:
+                insts.push_back(std::make_shared<DeclareInstruction>(varName, rand() % 100));
+                varCounter++;
+                break;
+            case 1:
+                insts.push_back(std::make_shared<AddInstruction>("x", "x", "1"));
+                break;
+            case 2:
+                insts.push_back(std::make_shared<SubtractInstruction>("x", "x", "1"));
+                break;
+            case 3:
+                insts.push_back(std::make_shared<PrintInstruction>("Instruction executed."));
+                break;
+            case 4: {
+                // Generate a random address within allocated space
+                int address = memoryManager->getRandomValidAddress(proc->getPID());
+
+                std::stringstream addrStream;
+                addrStream << std::hex << address;
+                std::string hexAddr = "0x" + addrStream.str();
+
+                std::string readVar = "r" + std::to_string(varCounter++);
+                insts.push_back(std::make_shared<ReadInstruction>(readVar, address, memoryManager.get()));
+                break;
+            }
+            case 5: {
+                int address = memoryManager->getRandomValidAddress(proc->getPID());
+                uint16_t value = rand() % 65536;
+
+                std::stringstream addStream;
+                addStream << std::hex << address;
+                std::string hexAddr = "0x" + addStream.str();
+
+                insts.push_back(std::make_shared<WriteInstruction>(hexAddr, std::to_string(value)));
+                break;
+            }
+        }
     }
 
     proc->setInstructions(insts);
@@ -282,11 +352,16 @@ void ConsoleManager::createProcess(const std::string& name, int instructionCount
     processTable[name] = proc;
     allProcesses.push_back(proc);
 
-    //new
-    int instructionSize = 4;
-    int totalBytes = instructionCount * instructionSize;
+    //new generate memory between min/max memperproc
+    int memoryBytes = minMemPerProc;
+    if(maxMemPerProc > minMemPerProc){
+        memoryBytes += rand() % (maxMemPerProc - minMemPerProc + 1);
+    }
+
+    proc->setMemoryRequirement(memoryBytes);
+
     int frameSize = memoryManager->getFrameSize();
-    int totalPages = (totalBytes + frameSize - 1) / frameSize;
+    int totalPages = (memoryBytes + frameSize - 1) / frameSize; // division
 
     memoryManager->registerProcess(proc->getPID(), totalPages);
 
@@ -294,65 +369,65 @@ void ConsoleManager::createProcess(const std::string& name, int instructionCount
             std::cout << "Insufficient memory for process " << name << "\n";
             return; // Don't create process
     }
-   //new
+   
 
     if(silent){
         std::cout << "Process " << name << " created with " << instructionCount << " instructions.\n";
     }
 }
 
-//new
-void ConsoleManager::screenCustom(const std::string& name) {
+//new - screeen -c custom input
+void ConsoleManager::screenCustom(const std::string& name, uint32_t memSize, const std::string& instructionStr) {
     std::vector<std::shared_ptr<Instruction>> insts;
-    std::string line;
 
-    std::cout << "Creating custom process: " << name << "\n";
-    std::cout << "Enter instructions one by one (type 'done' to finish):\n";
+    std::istringstream stream(instructionStr);
+    std::string token;
 
-    while (true) {
-        std::cout << "> ";
-        std::getline(std::cin, line);
+    while (std::getline(stream, token, ';')){
+        std::istringstream line(token);
+        std::string type;
+        line >> type;
 
-        if (line == "done") break;
-
-        std::istringstream iss(line);
-        std::string cmd;
-        iss >> cmd;
-
-        if (cmd == "PRINT") {
-            std::string msg;
-            std::getline(iss, msg);
-            insts.push_back(std::make_shared<PrintInstruction>(msg));
-        } else if (cmd == "DECLARE") {
+        if (type == "READ") {
             std::string var;
-            int val;
-            iss >> var >> val;
-            insts.push_back(std::make_shared<DeclareInstruction>(var, val));
-        } else if (cmd == "ADD") {
-            std::string dest, src1, src2;
-            iss >> dest >> src1 >> src2;
-            insts.push_back(std::make_shared<AddInstruction>(dest, src1, src2));
-        } else if (cmd == "SUBTRACT") {
-            std::string dest, src1, src2;
-            iss >> dest >> src1 >> src2;
-            insts.push_back(std::make_shared<SubtractInstruction>(dest, src1, src2));
+            std::string addrStr;
+            line >> var >> addrStr;
+            int addr = std::stoi(addrStr, nullptr, 16);
+
+            auto readInst = std::make_shared<ReadInstruction>(var, addr, memoryManager.get());
+            insts.push_back(readInst);
+        } else if (type == "WRITE") {
+            std::string addrStr;
+            int value;
+            line >> addrStr >> value;
+            int addr = std::stoi(addrStr, nullptr, 16);
+
+            std::stringstream ss;
+            ss << std::hex << addr;
+            std::string hexAddr = ss.str();
+
+            auto writeInst = std::make_shared<WriteInstruction>(hexAddr, std::to_string(value));
+            insts.push_back(writeInst);
         } else {
-            std::cout << "Unknown instruction format.\n";
+            std::cout << "Unknown instruction type: " << type << "\n";
+            return;
         }
     }
-
+    
+    if (insts.empty() || insts.size() > 50) {
+        std::cout << "Invalid number of instructions (1–50 allowed).\n";
+        return;
+    }
+    
     auto proc = std::make_shared<Process>(++currentPID, name, insts.size());
     proc->setInstructions(insts);
+    proc->setMemoryRequirement(memSize);
 
-    // === MEMORY REGISTRATION AND ALLOCATION ===
-    int instructionSize = 4;
-    int totalBytes = insts.size() * instructionSize;
     int frameSize = memoryManager->getFrameSize();
-    int totalPages = (totalBytes + frameSize - 1) / frameSize;
-
+    int totalPages = (memSize + frameSize - 1) / frameSize;
     memoryManager->registerProcess(proc->getPID(), totalPages);
 
-    if (!memoryManager->allocateMemory(proc)) {
+     if (!memoryManager->allocateMemory(proc)) {
         std::cout << "Insufficient memory for process " << name << "\n";
         return;
     }
@@ -402,8 +477,6 @@ void ConsoleManager::listScreens() {
                       << ", State: " << stateStr << ", Progress: "
                       << proc->getCommandCounter() << "/" << proc->getLinesOfCode()
                       << ")\n";
-            // std::cout << "  " << proc->getName() << " (PID: " << proc->getPID()
-            //           << ", State: " << stateStr << ")\n";
         }
     }
 
@@ -411,7 +484,6 @@ void ConsoleManager::listScreens() {
         std::cout << "  No active processes.\n";
     }
  
-
     std::cout << "\n=== Finished Processes ===\n";
     bool anyFinished = false;
     for (const auto& pair : processTable) {
@@ -423,6 +495,7 @@ void ConsoleManager::listScreens() {
                       << ", Core: " << proc->getCoreID()
                       << ", Finished at: " << proc->getFinishTimeString()
                       << ", Total Instructions: " << proc->getLinesOfCode()
+                      << ", Memory Requirement: " << proc->getMemoryRequirement() << " bytes"
                       << ")\n";
         }
     }
@@ -433,7 +506,7 @@ void ConsoleManager::listScreens() {
 
 //added memSize
 // screen -s make process 
-void ConsoleManager::screenAttach(const std::string& name) {
+void ConsoleManager::screenAttach(const std::string& name, int memSize) {
     // If process does not exist, create it
     if (processTable.count(name) == 0) {
         int instructionCount = minInstructions + (rand() % (maxInstructions - minInstructions + 1));

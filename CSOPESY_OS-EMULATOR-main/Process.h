@@ -7,6 +7,12 @@
 #include <chrono>
 #include "Instruction.h"
 #include "MemoryManager.h"  // Required for memory-related execution
+#include "InstructionsTypes.h"
+
+//New forward declarations
+class Instruction;
+class MemoryManager;
+struct PageTableEntry;
 
 class Process {
 public:
@@ -41,6 +47,10 @@ public:
     const std::vector<std::shared_ptr<Instruction>>& getInstructions() const;
     //new
 
+    //new for memory requirment passing
+    void setMemoryRequirement(int bytes);
+    int getMemoryRequirement() const;
+
 private:
     int pid;
     std::string name;
@@ -56,6 +66,10 @@ private:
     std::vector<PageTableEntry> pageTable;  // One entry per virtual page
     
     //new 
+
+    //new add memory requirement 
+    int memoryRequirementBytes = 0;  // Memory size M assigned to the process
+
 
     bool sleeping = false;
     int sleepTicks = 0;

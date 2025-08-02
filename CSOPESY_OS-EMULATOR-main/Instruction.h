@@ -2,10 +2,13 @@
 #include <string>
 #include <unordered_map>
 #include <cstdint>
+#include <memory>
+
+//Forward declaration
+class MemoryManager;
 
 class Instruction {
 public:
-
     std::string content;
     std::string type;
     int virtualAddress = -1; 
@@ -25,5 +28,5 @@ public:
         std::shared_ptr<MemoryManager> memoryManager
     ) = 0;
 
-    virtual ~Instruction() = default;
+    virtual ~Instruction() {}
 };

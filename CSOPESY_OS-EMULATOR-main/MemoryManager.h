@@ -32,6 +32,9 @@ struct FrameInfo {
 };
 // new
 
+//new add declaration of Process Class
+class Process; 
+
 class MemoryManager {
 public:
     // mew : int instructionSize
@@ -45,14 +48,19 @@ public:
     int getFrameFromVirtualAddress(int pid, int virtualAddress);
 
     int getFrameSize() const;
-    bool isAddressValid(int pid, int virtualAddress); // newest
-
-    // new
+    bool isAddressValid(int pid, int virtualAddress);
     void printMemoryState();
     void registerProcess(int pid, int totalPages);
     int getInstructionsPerPage() const;
+
+    // new for VMSTAT, ProcessSmi, Write instruction, Read Instruction
     void printVMStat() const;
-    // new
+    void printProcessSMI() const;
+    bool writeToAddress(int pid, uint16_t address, uint16_t value); 
+    uint16_t readFromAddress(int pid, uint16_t address);
+    std::string toHex(uint16_t value);
+    int getRandomValidAddress(int pid);
+
 
 private:
     int maxMemory;
@@ -77,9 +85,9 @@ private:
     std::list<std::pair<int, int>> lruList; // (pid, pageNumber)
    
     // new
-    std::unordered_map<int, std::unordered_map<int, std::list<std::pair<int, int>>::iterator>> lruMap;
     std::unordered_map<int, std::unordered_set<int>> backingStore; // pid -> set of pageNumbers
     std::unordered_map<int, int> processTotalPages; // pid -> number of total pages
+    std::unordered_map<int, std::unordered_map<uint16_t, uint16_t>> ram; // pid → address → value
     // new
 
     int getFreeFrame();

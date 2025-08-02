@@ -143,38 +143,96 @@ void MemoryManager::accessPage(int pid, int pageNumber) {
     updateLRU(pid, pageNumber);
 }
 
+//new function -for vmstat
 void MemoryManager::printVMStat() const {
     std::cout << "\n=== VMSTAT ===\n";
     std::cout << "Total Frames: " << totalFrames << "\n";
 
     int used = 0;
-    int free = 0;
-    for (size_t i = 0; i < frameTable.size(); ++i) {
-        if (frameTable[i])
-            used++;
-        else
-            free++;
+
+    for (bool usedBit : frameTable){
+        if (usedBit) used++;
     }
 
+    int free = totalFrames - used;
     std::cout << "Used Frames: " << used << "\n";
-    std::cout << "Free Frames: " << (totalFrames - used) << "\n";
+    std::cout << "Free Frames: " << free << "\n";
 
-    std::cout << "\nProcess Page Tables:\n";
-    for (const auto& entry : pageTables) {
-        int pid = entry.first;
-        const auto& pageMap = entry.second;
+    std::cout << "\nPer-Process Page Table Info:\n";
+    for (const auto& procEntry : pageTables) {
+        int pid = procEntry.first;
+        const auto& pageMap = procEntry.second;
 
-        std::cout << "PID " << pid << ": ";
+        std::cout << "PID " << pid << "\n";
         for (const auto& pagePair : pageMap) {
-            int frame = pagePair.second.frameNumber;
-            std::cout << frame << " ";
+            int pageNumber = pagePair.first;
+            const PageTableEntry& entry = pagePair.second;
+
+            std::cout << " Page " << pageNumber << "->";
+            if (entry.valid){
+                std::cout << "Frame: " << entry.frameNumber;
+            } else {
+                std::cout << "BACKING STORE";
+            }
+            std::cout << ", Last Used Tick: " << entry.lastUsedTick << "\n";
+           
         }
-        std::cout << "\n";
+    }
+    std::cout << "=================\n";
+
+    //view of backing store
+    std::ofstream backingStoreOut("csopesy-backing-store.txt");
+    if(!backingStoreOut.is_open()){
+        std::cerr << "Failed to open csopesy-backing-store.txt\n";
+        return;
     }
 
-    std::cout << "=================\n";
+    backingStoreOut << "=== BACKING STORE SNAPSHOT ===\n";
+    for (const auto& [pid, pageSet] : backingStore) {
+        backingStoreOut << "Process PID: " << pid << "\n";
+        for (int page : pageSet) {
+            backingStoreOut << "  Stored Page: " << page << "\n";
+        }
+        backingStoreOut << "\n";
+    }
+    backingStoreOut << "==============================\n";
+    backingStoreOut.close();
 }
-//new
+
+
+//new function for process-smi
+void MemoryManager::printProcessSMI() const{
+    std::cout << "\n=== PROCESS-SMI ===\n";
+    
+    int total = frameTable.size();
+    int used = 0;
+    for (bool status : frameTable) {
+        if (status) used++;
+    }
+
+    int free = total - used;
+
+    std::cout << "Total Memory (bytes): " << total * frameSize << "\n";
+    std::cout << "Used Memory (bytes): " << used * frameSize << "\n";
+    std::cout << "Free Memory (bytes): " << free * frameSize << "\n\n";
+
+    std::cout << "Per-Process Memory Usage:\n";
+
+    for (const auto& [pid, table] : pageTables) {
+        int frameCount = 0;
+        for (const auto& [vpn, pte] : table) {
+            if (pte.valid) frameCount++;
+        }
+
+        std::cout << "PID " << pid 
+                  << " → Used Frames: " << frameCount 
+                  << ", Bytes: " << (frameCount * frameSize) << "\n";
+    }
+
+    std::cout << "=====================\n";
+}
+
+
 
 int MemoryManager::getFrameFromVirtualAddress(int pid, int virtualAddress) {
     //new
@@ -212,8 +270,6 @@ void MemoryManager::registerProcess(int pid, int instructionCount) {
 int MemoryManager::getInstructionsPerPage() const {
     return instructionsPerPage;
 }
- // new
-
  //newest checks if an address is valid for a given process.
  bool MemoryManager::isAddressValid(int pid, int virtualAddress) {
     if (processTotalPages.find(pid) == processTotalPages.end()) return false;
@@ -224,4 +280,65 @@ int MemoryManager::getInstructionsPerPage() const {
 }
 
 
+//New - read instruction
+uint16_t MemoryManager::readFromAddress(int pid, uint16_t address) {
+    // Check if address is valid for this process
+    if (!isAddressValid(pid, address)) {
+        throw std::runtime_error("Memory violation: address 0x" + 
+                                 toHex(address) + " is invalid for process P" + 
+                                 std::to_string(pid));
+    }
+
+    // Ensure page is loaded; simulate page fault if not
+    if (!ensurePageLoaded(pid, address)) {
+        throw std::runtime_error("Page fault: page not loaded for address 0x" + 
+                                 toHex(address) + " in process P" + std::to_string(pid));
+    }
+
+    // Return the value from simulated RAM
+    return ram[pid][address];
+}
+
+std::string MemoryManager::toHex(uint16_t value) {
+    std::stringstream ss;
+    ss << std::hex << std::uppercase << value;
+    return ss.str();
+}
+
+//New -write instruction to memory (RAM)
+bool MemoryManager::writeToAddress(int pid, uint16_t address, uint16_t value) {
+    // Check if address is valid for the process
+    if (!isAddressValid(pid, address)) {
+        std::cerr << "Memory violation: Invalid address 0x" << toHex(address)
+                  << " for process P" << pid << std::endl;
+        return false;
+    }
+
+    // Ensure the page is loaded into memory (should already be done by the instruction)
+    if (!ensurePageLoaded(pid, address)) {
+        std::cerr << "Page fault: Page not loaded for address 0x" << toHex(address)
+                  << " in process P" << pid << std::endl;
+        return false;
+    }
+
+    // Simulate writing to physical memory
+    ram[pid][address] = value;
+
+    return true;
+}
+
+//New - check for valid address
+int MemoryManager::getRandomValidAddress(int pid) {
+    if (processTotalPages.find(pid) == processTotalPages.end()) {
+        return 0x0000;  // No pages allocated
+    }
+
+    int totalPages = processTotalPages[pid];
+    if (totalPages == 0) return 0x0000;
+
+    int page = rand() % totalPages;
+    int offset = rand() % frameSize;
+
+    return page * instructionsPerPage + offset;  // Virtual address
+}
 
