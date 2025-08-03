@@ -157,6 +157,7 @@ void ConsoleManager::run() {
         } else {
             std::cout << "Unknown command.\n";
         }
+
         Option2();
     }
 }
@@ -244,17 +245,37 @@ void ConsoleManager::startScheduler() {
 
 
     //thick thread
-    schedulerThread = std::thread([this](){
-        while (ticking){
-            scheduler->tick();
-            quantumCounter++;
-            if(quantumCounter % quantumCycles == 0){
-               // memoryManager->snapshot(quantumCounter); //snap shot every quantum cycle only 
-            }  
+    // schedulerThread = std::thread([this](){
+    //     while (ticking){
+    //         scheduler->tick();
+    //         quantumCounter++;
+    //         if(quantumCounter % quantumCycles == 0){
+    //            // memoryManager->snapshot(quantumCounter); //snap shot every quantum cycle only 
+    //         }  
+    //         std::this_thread::sleep_for(std::chrono::milliseconds(cpuCycleTicks));
+    //     }
+
+    // });
+    schedulerThread = std::thread([this]() {
+    while (ticking) {
+        scheduler->tick();
+        quantumCounter++;
+
+            if (quantumCounter % quantumCycles == 0) {
+                // memoryManager->snapshot(quantumCounter);
+            }
+
+            // ✅ Stop when all processes are done and scheduler is idle
+            if (scheduler->allProcessesFinished() && scheduler->isIdle()) {
+                std::cout << "All processes finished. Stopping scheduler thread.\n";
+                ticking = false; // Stop ticking loop
+                break;
+            }
+
             std::this_thread::sleep_for(std::chrono::milliseconds(cpuCycleTicks));
         }
-
     });
+
 
     //make processes in the background
     std::thread([this](){

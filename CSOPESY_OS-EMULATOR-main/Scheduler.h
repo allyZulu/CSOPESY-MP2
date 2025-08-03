@@ -23,6 +23,11 @@ public:
     std::string getAlgorithm() const;
     int getAvailableCores() const;
 
+    //new
+    bool allProcessesFinished() const;
+    bool isIdle() const;
+
+
 private:
     int numCores;
     std::string schedulingAlgorithm; // "fcfs" or "rr"

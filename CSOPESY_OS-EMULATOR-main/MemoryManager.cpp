@@ -69,7 +69,8 @@ void MemoryManager::deallocateMemory(std::shared_ptr<Process> process) {
         for (auto& entry : pageTables[pid]) {
             int frame = entry.second.frameNumber; 
             if (entry.second.valid && entry.second.frameNumber != -1) {
-                frameTable[frame] = false; // mark frame as free 
+                //frameTable[frame] = false; // mark frame as free 
+                frameTable[frame] = -1; //change first line
             }
         }
         pageTables.erase(pid);
@@ -83,12 +84,21 @@ void MemoryManager::deallocateMemory(std::shared_ptr<Process> process) {
    //new
 }
 
+// int MemoryManager::getFreeFrame() {
+//     for (int i = 0; i < totalFrames; ++i) {
+//         if (frameTable[i] == -1) return i;
+//     }
+//     return -1; // No free frame
+// }
+
+//new
 int MemoryManager::getFreeFrame() {
     for (int i = 0; i < totalFrames; ++i) {
-        if (frameTable[i] == -1) return i;
+        if (!frameTable[i]) return i; // free frame found
     }
-    return -1; // No free frame
+    return -1;
 }
+
 
 void MemoryManager::evictPageLRU() {
     if (lruList.empty()) return;
@@ -114,28 +124,83 @@ void MemoryManager::updateLRU(int pid, int pageNumber) {
     lruMap[pid][pageNumber] = lruList.begin();
 }
 
+// bool MemoryManager::ensurePageLoaded(int pid, int virtualAddress) {
+//     //neww
+//     int pageNumber = virtualAddress / instructionsPerPage;
+//     if (pageTables[pid][pageNumber].valid) {
+//         accessPage(pid, pageNumber);
+//         return true;
+//     }
+
+//     int frame = getFreeFrame();
+//     if (frame == -1) {
+//         evictPageLRU();
+//         frame = getFreeFrame();
+//         if (frame == -1) return false;
+//     }
+
+//     //frameTable[frame] = true;
+//     frameTable[frame] = pid; //change from first line before it
+//     pageTables[pid][pageNumber] = {frame, true, 0};
+//     backingStore[pid].insert(pageNumber);
+//     updateLRU(pid, pageNumber);
+//     return true;
+//     //new
+// }
+
 bool MemoryManager::ensurePageLoaded(int pid, int virtualAddress) {
-    //neww
     int pageNumber = virtualAddress / instructionsPerPage;
+
+    // If page is already valid, just update LRU
+    // if (pageTables[pid][pageNumber].valid) {
+    //     accessPage(pid, pageNumber);
+    //     return true;
+    // }
+
+    //new
+   // int pageNumber = virtualAddress / instructionsPerPage;
+
+    // ✅ If page doesn't exist for this process, return false immediately
+    if (processTotalPages.find(pid) == processTotalPages.end() ||
+        pageNumber >= processTotalPages[pid]) {
+        return false; // Invalid page → no retry
+    }
+
+    // ✅ If already loaded
     if (pageTables[pid][pageNumber].valid) {
         accessPage(pid, pageNumber);
         return true;
     }
 
+
+    // Try to get a free frame
     int frame = getFreeFrame();
+    // if (frame == -1) {
+    //     evictPageLRU();
+    //     frame = getFreeFrame();
+    // }
     if (frame == -1) {
-        evictPageLRU();
-        frame = getFreeFrame();
-        if (frame == -1) return false;
+    evictPageLRU();
+    frame = getFreeFrame();
+        if (frame == -1) {
+            return false; // ✅ Stop instead of infinite retry
+        }
     }
 
+
+    // If still no frame, cannot load now
+    if (frame == -1) {
+        return false;  // Scheduler will requeue the process
+    }
+
+    // Allocate frame and mark page as valid
     frameTable[frame] = true;
     pageTables[pid][pageNumber] = {frame, true, 0};
     backingStore[pid].insert(pageNumber);
     updateLRU(pid, pageNumber);
     return true;
-    //new
 }
+
 
 //new
 void MemoryManager::accessPage(int pid, int pageNumber) {
