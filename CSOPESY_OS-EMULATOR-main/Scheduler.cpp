@@ -20,7 +20,7 @@ void Scheduler::addProcess(std::shared_ptr<Process> process) {
         process->setState(Process::READY);
         readyQueue.push(process);
     } else {
-        std::cerr << "Memory allocation failed for PID " << process->getPID() << "\n";
+    //   std::cerr << "Memory allocation failed for PID " << process->getPID() << "\n";
     }
     //new
 }

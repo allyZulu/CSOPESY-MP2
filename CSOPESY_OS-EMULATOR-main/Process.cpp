@@ -47,6 +47,19 @@ void Process::executeNextInstruction(int coreID) {
         currentState = FINISHED;
         markFinished();
     }
+    // NEW: check if it was terminated due to invalid memory
+    if (sleeping && outputLog.find("Memory violation") != std::string::npos) {
+        auto now = std::chrono::system_clock::now();
+        std::time_t now_time = std::chrono::system_clock::to_time_t(now);
+        std::tm local_tm = *std::localtime(&now_time);
+
+        std::ostringstream oss;
+        oss << std::put_time(&local_tm, "%H:%M:%S");
+
+        // Extract invalid address from the log (or pass it from instruction)
+        std::string address = "???"; // optional parse from log
+        setTerminatedDueToViolation(oss.str(), address);
+    }
 }
 
 bool Process::isFinished() const {
@@ -141,3 +154,24 @@ int Process::getMemoryRequirement() const {
 }
 
 //new
+
+// access violation
+void Process::setTerminatedDueToViolation(const std::string& time, const std::string& address) {
+    terminatedDueToViolation = true;
+    violationTime = time;
+    violationAddress = address;
+    currentState = FINISHED;
+    markFinished();
+}
+
+bool Process::hasTerminatedDueToViolation() const {
+    return terminatedDueToViolation;
+}
+
+std::string Process::getViolationTime() const {
+    return violationTime;
+}
+
+std::string Process::getViolationAddress() const {
+    return violationAddress;
+}

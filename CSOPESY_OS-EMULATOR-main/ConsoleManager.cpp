@@ -536,6 +536,16 @@ void ConsoleManager::screenReattach(const std::string& name) {
         std::cout << "Process \"" << name << "\" does not exist.\n";
         return;
     }
+    // access violation check
+    // If process has terminated due to access violation, print error message
+    auto proc = it->second;
+    if (proc->hasTerminatedDueToViolation()) {
+    std::cout << "Process " << name 
+              << " shut down due to memory access violation error that occurred at "
+              << proc->getViolationTime() << ". "
+              << proc->getViolationAddress() << " invalid.\n";
+    return;
+    }
 
     processScreen(it->second);
 }

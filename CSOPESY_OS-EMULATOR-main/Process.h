@@ -51,6 +51,13 @@ public:
     void setMemoryRequirement(int bytes);
     int getMemoryRequirement() const;
 
+    //access violation
+    void setTerminatedDueToViolation(const std::string& time, const std::string& address);
+    bool hasTerminatedDueToViolation() const;
+    std::string getViolationTime() const;
+    std::string getViolationAddress() const;
+
+
 private:
     int pid;
     std::string name;
@@ -77,4 +84,10 @@ private:
     bool hasFinishTime = false;
 
     std::shared_ptr<MemoryManager> memoryManager = nullptr; // ✅ Added
+
+    // access violation 
+    bool terminatedDueToViolation = false;
+    std::string violationTime;
+    std::string violationAddress;
+
 };
