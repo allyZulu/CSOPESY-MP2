@@ -52,7 +52,8 @@ void Option1() {
 void Option2() {
     std::cout << "\nOptions:" << std::endl;
     std::cout << "- screen -ls" << std::endl;
-    std::cout << "- screen -s [process name]" << std::endl;
+    std::cout << "- screen -s [process name] [memory size]" << std::endl;
+    std::cout << "- screen -c [process name] [memory size] [instructions] " << std::endl; //new function for mo2
     std::cout << "- screen -r [process name]" << std::endl;
     std::cout << "- scheduler-start" << std::endl;
     std::cout << "- scheduler-stop" << std::endl;
@@ -266,9 +267,16 @@ void ConsoleManager::startScheduler() {
             }
 
             // ✅ Stop when all processes are done and scheduler is idle
+            // if (scheduler->allProcessesFinished() && scheduler->isIdle()) {
+            //     std::cout << "All processes finished. Stopping scheduler thread.\n";
+            //     ticking = false; // Stop ticking loop
+            //     break;
+            // }
+
             if (scheduler->allProcessesFinished() && scheduler->isIdle()) {
-                std::cout << "All processes finished. Stopping scheduler thread.\n";
-                ticking = false; // Stop ticking loop
+                std::cout << "\nAll processes finished. Stopping scheduler thread.\n";
+                ticking = false;
+                generating = false;
                 break;
             }
 

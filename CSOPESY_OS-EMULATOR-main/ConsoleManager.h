@@ -40,6 +40,10 @@ private:
     std::thread schedulerThread;
     std::atomic<bool> ticking{false};
     std::atomic<bool> generating{false};
+
+    //std::thread schedulerThread;
+    std::thread processGenerationThread; 
+    bool schedulerActive = false;
     //added
 
     std::unordered_map<std::string, std::shared_ptr<Process>> processTable;
