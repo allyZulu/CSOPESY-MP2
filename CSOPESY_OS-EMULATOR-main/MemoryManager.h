@@ -62,6 +62,9 @@ public:
     int getRandomValidAddress(int pid);
     int getInstructionPageNumber(int programCounter);
 
+    //ALLY
+    bool isPageLoaded(int pid, int pageNumber) const;
+//ALLY
 
 private:
     int maxMemory;

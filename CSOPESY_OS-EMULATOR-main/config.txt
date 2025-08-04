@@ -1,9 +1,9 @@
 num-cpu 2
-scheduler fcfs
-quantum-cycles 0
+scheduler rr
+quantum-cycles 4
 batch-process-freq 1
-min-ins 4000
-max-ins 4000
+min-ins 1000
+max-ins 1000
 delay-per-exec 0
 max-overall-mem 512
 mem-per-frame 256

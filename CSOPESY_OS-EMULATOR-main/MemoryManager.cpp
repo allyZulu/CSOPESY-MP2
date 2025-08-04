@@ -117,6 +117,56 @@ void MemoryManager::updateLRU(int pid, int pageNumber) {
 }
 
 
+//ALLY
+bool MemoryManager::ensurePageLoaded(int pid, int virtualAddress) {
+    // --- Detect if caller is directly requesting a page number ---
+    int pageNumber;
+    if (virtualAddress == 0) {
+        // Special case: symbol table page
+        pageNumber = 0;
+    } else {
+        // Convert from virtual address to page number
+        pageNumber = virtualAddress / instructionsPerPage;
+    }
+
+    // --- Check if page is valid ---
+    if (processTotalPages.find(pid) == processTotalPages.end() ||
+        pageNumber >= processTotalPages[pid] || pageNumber < 0) {
+        return false; // invalid page
+    }
+
+    // --- Already loaded? ---
+    if (pageTables[pid][pageNumber].valid) {
+        accessPage(pid, pageNumber);
+        return true;
+    }
+
+    // --- Try to get free frame ---
+    int frame = getFreeFrame();
+    if (frame == -1) {
+        evictPageLRU();
+        frame = getFreeFrame();
+    }
+    if (frame == -1) {
+        return false; // still no memory
+    }
+
+    // --- Allocate & mark valid ---
+    frameTable[frame] = true;
+    pageTables[pid][pageNumber] = {frame, true, 0};
+    backingStore[pid].insert(pageNumber);
+
+    // --- KEEP PAGE 0 PERMANENTLY ---
+    if (pageNumber == 0) {
+        pageTables[pid][pageNumber].lastUsedTick = INT_MAX; // never evict
+    }
+
+    updateLRU(pid, pageNumber);
+    return true;
+}
+//ALLY 
+
+/* 
 bool MemoryManager::ensurePageLoaded(int pid, int virtualAddress) {
     int pageNumber = virtualAddress / instructionsPerPage;
 
@@ -141,7 +191,9 @@ bool MemoryManager::ensurePageLoaded(int pid, int virtualAddress) {
     evictPageLRU();
     frame = getFreeFrame();
         if (frame == -1) {
-            return false; // Stop instead of infinite retry
+            //ALLY
+            evictPageLRU();
+            frame = getFreeFrame();
         }
     }
 
@@ -158,7 +210,7 @@ bool MemoryManager::ensurePageLoaded(int pid, int virtualAddress) {
     updateLRU(pid, pageNumber);
     return true;
 }
-
+*/
 
 
 void MemoryManager::accessPage(int pid, int pageNumber) {
@@ -275,6 +327,29 @@ void MemoryManager::printMemoryState() {
 }
 
 
+void MemoryManager::registerProcess(int pid, int instructionCount) {
+    const int SYMBOL_TABLE_PAGES = 1;
+    int instructionPages = (instructionCount + instructionsPerPage - 1) / instructionsPerPage;
+    int totalPages = instructionPages + SYMBOL_TABLE_PAGES;
+
+    processTotalPages[pid] = totalPages;
+
+    // Create page table entries
+    for (int i = 0; i < totalPages; ++i) {
+        pageTables[pid][i] = {-1, false, 0};
+        backingStore[pid].insert(i);
+    }
+
+    // ✅ Try to load symbol table (page 0) into RAM right away
+    int frame = getFreeFrame();
+    if (frame != -1) {
+        frameTable[frame] = true;
+        pageTables[pid][0] = {frame, true, INT_MAX}; // mark valid & pin it
+        updateLRU(pid, 0);
+    }
+}
+
+/*
 // Prepares all valid pages of a process (instructions + symbol table) in the backing store
 void MemoryManager::registerProcess(int pid, int instructionCount) {
     const int SYMBOL_TABLE_PAGES = 1;
@@ -287,6 +362,7 @@ void MemoryManager::registerProcess(int pid, int instructionCount) {
     processTotalPages[pid] = totalPages;  // Track for cleanup or diagnostics
 
 }
+*/
 
 // 
 int MemoryManager::getInstructionsPerPage() const {
