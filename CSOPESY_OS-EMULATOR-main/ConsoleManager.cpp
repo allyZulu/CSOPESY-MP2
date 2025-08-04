@@ -247,10 +247,7 @@ void ConsoleManager::startScheduler() {
     schedulerThread = std::thread([this](){
         while (ticking){
             scheduler->tick();
-            quantumCounter++;
-            if(quantumCounter % quantumCycles == 0){
-               // memoryManager->snapshot(quantumCounter); //snap shot every quantum cycle only 
-            }  
+            quantumCounter++;  
             std::this_thread::sleep_for(std::chrono::milliseconds(cpuCycleTicks));
         }
 
@@ -258,16 +255,30 @@ void ConsoleManager::startScheduler() {
 
     //make processes in the background
     std::thread([this](){
+        // while(generating){                                       
+        //     std::this_thread::sleep_for(std::chrono::seconds(batchProcessFreq));
+
+        //     // Generate a new dummy process
+        //     std::string procName = "p" + std::to_string(currentPID);
+        //     int instCount = minInstructions + (rand() % (maxInstructions - minInstructions + 1));
+        //     createProcess(procName, instCount, false);
+        //     scheduler->addProcess(allProcesses.back());
+
+        //     //std::cout << "Auto-created process: " << procName << " with " << instCount << " instructions\n";
+        // }
+
+        try {
         while(generating){
             std::this_thread::sleep_for(std::chrono::seconds(batchProcessFreq));
-
-            // Generate a new dummy process
-            std::string procName = "p" + std::to_string(++currentPID);
+            std::string procName = "p" + std::to_string(currentPID);
             int instCount = minInstructions + (rand() % (maxInstructions - minInstructions + 1));
             createProcess(procName, instCount, false);
             scheduler->addProcess(allProcesses.back());
-
-            //std::cout << "Auto-created process: " << procName << " with " << instCount << " instructions\n";
+        }
+        } catch (const std::exception& e) {
+            std::cerr << "[Error in process generation thread] " << e.what() << std::endl;
+        } catch (...) {
+            std::cerr << "[Unknown error in process generation thread]\n";
         }
 
     }).detach();
@@ -288,7 +299,7 @@ void ConsoleManager::stopScheduler() {
     generating = false;
 
      // new
-    ticking = false; // di na gagawa ng instructions 
+    ticking = true; // will still run sched algo
      // new
 
     std::cout << "No new processes will be auto-generated. Scheduler is still running.\n";
@@ -296,7 +307,25 @@ void ConsoleManager::stopScheduler() {
 
 void ConsoleManager::createProcess(const std::string& name, int instructionCount, bool silent) {
    auto proc = std::make_shared<Process>(++currentPID, name, instructionCount);
+    proc->setMemoryManager(memoryManager.get());
 
+    //new generate memory between min/max memperproc
+    int memoryBytes = minMemPerProc;
+    if(maxMemPerProc > minMemPerProc){
+        memoryBytes += rand() % (maxMemPerProc - minMemPerProc + 1);
+    }
+
+    proc->setMemoryRequirement(memoryBytes);
+
+    int frameSize = memoryManager->getFrameSize();
+    int totalPages = (memoryBytes + frameSize - 1) / frameSize; // division
+
+    memoryManager->registerProcess(proc->getPID(), totalPages);
+
+    if(!memoryManager->allocateMemory(proc)){
+            std::cout << "Insufficient memory for process " << name << "\n";
+            return; // Don't create process
+    }
 
     // Generate dummy instructions
     std::vector<std::shared_ptr<Instruction>> insts;
@@ -351,25 +380,6 @@ void ConsoleManager::createProcess(const std::string& name, int instructionCount
 
     processTable[name] = proc;
     allProcesses.push_back(proc);
-
-    //new generate memory between min/max memperproc
-    int memoryBytes = minMemPerProc;
-    if(maxMemPerProc > minMemPerProc){
-        memoryBytes += rand() % (maxMemPerProc - minMemPerProc + 1);
-    }
-
-    proc->setMemoryRequirement(memoryBytes);
-
-    int frameSize = memoryManager->getFrameSize();
-    int totalPages = (memoryBytes + frameSize - 1) / frameSize; // division
-
-    memoryManager->registerProcess(proc->getPID(), totalPages);
-
-    if(!memoryManager->allocateMemory(proc)){
-            std::cout << "Insufficient memory for process " << name << "\n";
-            return; // Don't create process
-    }
-   
 
     if(silent){
         std::cout << "Process " << name << " created with " << instructionCount << " instructions.\n";

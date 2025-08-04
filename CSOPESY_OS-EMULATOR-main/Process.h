@@ -35,8 +35,9 @@ public:
     void setCoreID(int coreID);
     void setState(ProcessState newState);
     void setInstructions(const std::vector<std::shared_ptr<Instruction>>& insts);
-    void setMemoryManager(const std::shared_ptr<MemoryManager>& memManager); // ✅ Added
-
+    //void setMemoryManager(const std::shared_ptr<MemoryManager>& memManager); // ✅ Added
+    void setMemoryManager(MemoryManager* memManager);
+    
     std::string getFinishTimeString() const;
     void markFinished();
 
@@ -65,7 +66,6 @@ private:
     int linesOfCode;
     int coreID;
     ProcessState currentState;
-
     std::vector<std::shared_ptr<Instruction>> instructions;
     std::unordered_map<std::string, uint16_t> variables;
     std::string outputLog;

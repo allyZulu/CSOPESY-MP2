@@ -219,3 +219,11 @@ void WriteInstruction::execute(
         outputLog += "Core " + std::to_string(coreID) + " | Process " + processName +
                      " wrote " + std::to_string(value) + " to address 0x" + address + "\n";
 }
+
+int ReadInstruction::getAddress() const{
+    return address;
+}
+
+int WriteInstruction::getAddress() const{
+    return std::stoi(address, nullptr, 16);
+}

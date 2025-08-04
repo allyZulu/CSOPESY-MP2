@@ -20,11 +20,13 @@ void Process::executeNextInstruction(int coreID) {
     // calculates which page the current instruction belongs to
     int currentPage = commandCounter / memoryManager->getInstructionsPerPage();
 
-    // Checks if the required page for this instruction is loaded 
-    if (!memoryManager->ensurePageLoaded(pid, currentPage)) {
-        std::cout << "[Page Fault] Process " << pid << " triggered loading of page "
-                  << currentPage << "\n";
-    }
+    // // Checks if the required page for this instruction is loaded 
+    // if (!memoryManager->ensurePageLoaded(pid, currentPage)) {
+    //     std::cout << "[Page Fault] Process " << pid << " triggered loading of page "
+    //               << currentPage << "\n";
+    // }
+
+    memoryManager->ensurePageLoaded(pid, currentPage);
 
     // updates the Least Recently Used (LRU) tracking for that page
     memoryManager->accessPage(pid, currentPage); // Mark page access for LRU
@@ -107,10 +109,9 @@ void Process::setInstructions(const std::vector<std::shared_ptr<Instruction>>& i
 }
 
 
-void Process::setMemoryManager(const std::shared_ptr<MemoryManager>& memManager) {
-    memoryManager = memManager;
+void Process::setMemoryManager(MemoryManager* memManager) {
+   memoryManager = std::shared_ptr<MemoryManager>(memManager);
 }
-
 void Process::markFinished() {
     if (!hasFinishTime) {
         finishTime = std::chrono::system_clock::now();

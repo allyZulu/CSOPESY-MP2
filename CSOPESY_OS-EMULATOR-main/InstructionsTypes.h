@@ -103,6 +103,8 @@ public:
             int& sleepTicks,
             std::shared_ptr<MemoryManager> memoryManager
         ) override;
+
+    int getAddress() const;
 };
 
 // ================== WriteInstruction ==================
@@ -122,5 +124,7 @@ public:
         int& sleepTicks,
         std::shared_ptr<MemoryManager> memoryManager
     ) override;
+
+    int getAddress() const;
 };
 

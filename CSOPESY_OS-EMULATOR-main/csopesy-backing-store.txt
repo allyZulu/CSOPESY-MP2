@@ -1,0 +1,14 @@
+=== BACKING STORE SNAPSHOT ===
+Process PID: 11
+  Stored Page: 3
+
+Process PID: 4
+  Stored Page: 0
+
+Process PID: 3
+  Stored Page: 0
+
+Process PID: 2
+  Stored Page: 0
+
+==============================

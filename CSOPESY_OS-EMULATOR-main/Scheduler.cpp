@@ -15,14 +15,9 @@ Scheduler::Scheduler(int numCores, const std::string& algorithm, int quantum, in
 void Scheduler::addProcess(std::shared_ptr<Process> process) {
     // process->setState(Process::READY);
     //new
-    int result = memoryManager->allocateMemory(process);
-    if (result == 0) {
-        process->setState(Process::READY);
-        readyQueue.push(process);
-    } else {
-    //   std::cerr << "Memory allocation failed for PID " << process->getPID() << "\n";
-    }
-    //new
+    //int result = memoryManager->allocateMemory(process);
+    process->setState(Process::READY);
+    readyQueue.push(process);
 }
 
 void Scheduler::tick() {
@@ -71,13 +66,43 @@ void Scheduler::executeProcesses() {
             auto instr = core.currentProcess->getCurrentInstruction();
 
             // Demand paging: ensure page is loaded
-            if (instr && !memoryManager->ensurePageLoaded(pid, instr->virtualAddress)) {
-                std::cerr << "Page fault: PID " << pid << " could not load page for address "
-                          << instr->virtualAddress << "\n";
-                continue;
+            // if (instr && !memoryManager->ensurePageLoaded(pid, instr->virtualAddress)) {
+            //     std::cerr << "Page fault: PID " << pid << " could not load page for address "
+            //               << instr->virtualAddress << "\n";
+            //     continue;
+            // }
+
+            if (instr) {
+                auto readInstr = dynamic_cast<ReadInstruction*>(instr);
+                if (readInstr) {
+                    if (!memoryManager->ensurePageLoaded(pid, readInstr->getAddress())) {
+                        // std::cerr << "Page fault: PID " << pid << " could not load page for READ address "
+                        //         << readInstr->getAddress() << "\n";
+                        continue;
+                    }
+                }
+
+                auto writeInstr = dynamic_cast<WriteInstruction*>(instr);
+                if (writeInstr) {
+                    if (!memoryManager->ensurePageLoaded(pid, writeInstr->getAddress())) {
+                        // std::cerr << "Page fault: PID " << pid << " could not load page for WRITE address "
+                        //         << writeInstr->getAddress() << "\n";
+                        continue;
+                    }
+                }
             }
 
-            core.currentProcess->executeNextInstruction(i);
+            //core.currentProcess->executeNextInstruction(i);
+
+            try {
+                core.currentProcess->executeNextInstruction(i);  // Safe: instruction execution wrapped
+            } catch (const std::runtime_error& e) {
+                std::cerr << "[Memory Fault] P" << core.currentProcess->getPID()
+                        << " - " << e.what() << std::endl;
+
+                // Optional: skip instruction advancement if you want to retry next cycle
+                // Optionally, you can also track a fault flag in the process if needed
+            }
 
             if(delayPerExec > 0){
                 volatile uint64_t busy = 0;

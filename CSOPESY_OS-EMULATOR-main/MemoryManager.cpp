@@ -85,7 +85,7 @@ void MemoryManager::deallocateMemory(std::shared_ptr<Process> process) {
 
 int MemoryManager::getFreeFrame() {
     for (int i = 0; i < totalFrames; ++i) {
-        if (frameTable[i] == -1) return i;
+        if (!frameTable[i]) return i;
     }
     return -1; // No free frame
 }
@@ -224,7 +224,7 @@ void MemoryManager::printProcessSMI() const{
         }
 
         std::cout << "PID " << pid 
-                  << " → Used Frames: " << frameCount 
+                  << " -> Used Frames: " << frameCount 
                   << ", Bytes: " << (frameCount * frameSize) << "\n";
     }
 
@@ -281,7 +281,7 @@ int MemoryManager::getInstructionsPerPage() const {
 
 //New - read instruction
 uint16_t MemoryManager::readFromAddress(int pid, uint16_t address) {
-    // Check if address is valid for this process
+    //Check if address is valid for this process
     if (!isAddressValid(pid, address)) {
         throw std::runtime_error("Memory violation: address 0x" + 
                                  toHex(address) + " is invalid for process P" + 
@@ -313,7 +313,7 @@ bool MemoryManager::writeToAddress(int pid, uint16_t address, uint16_t value) {
         return false;
     }
 
-    // Ensure the page is loaded into memory (should already be done by the instruction)
+    //Ensure the page is loaded into memory (should already be done by the instruction)
     if (!ensurePageLoaded(pid, address)) {
         std::cerr << "Page fault: Page not loaded for address 0x" << toHex(address)
                   << " in process P" << pid << std::endl;
