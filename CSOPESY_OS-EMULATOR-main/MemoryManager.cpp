@@ -15,7 +15,7 @@ int MemoryManager::getFrameSize() const {
     return frameSize;
 }
 
-//newest: removed registerProcess(pid, totalPages); kasi redundant na
+
 bool MemoryManager::allocateMemory(std::shared_ptr<Process> proc) {
     // No-op in demand paging — memory is allocated per-page as needed
     //new
@@ -59,18 +59,17 @@ bool MemoryManager::allocateMemory(std::shared_ptr<Process> proc) {
     }
     return true;
 }
-//newest
 
-// newest edited this one 
+
+
 void MemoryManager::deallocateMemory(std::shared_ptr<Process> process) {
-   //new
    int pid = process->getPID();   // Check if the process has a page table
     if (pageTables.find(pid) != pageTables.end()) {
         for (auto& entry : pageTables[pid]) {
             int frame = entry.second.frameNumber; 
             if (entry.second.valid && entry.second.frameNumber != -1) {
                 //frameTable[frame] = false; // mark frame as free 
-                frameTable[frame] = -1; //change first line
+                frameTable[frame] = false; //change first line
             }
         }
         pageTables.erase(pid);
@@ -81,17 +80,10 @@ void MemoryManager::deallocateMemory(std::shared_ptr<Process> process) {
     pageToFrame.erase(pid);
     lruMap.erase(pid);
     processTotalPages.erase(pid);
-   //new
 }
 
-// int MemoryManager::getFreeFrame() {
-//     for (int i = 0; i < totalFrames; ++i) {
-//         if (frameTable[i] == -1) return i;
-//     }
-//     return -1; // No free frame
-// }
 
-//new
+
 int MemoryManager::getFreeFrame() {
     for (int i = 0; i < totalFrames; ++i) {
         if (!frameTable[i]) return i; // free frame found
@@ -124,49 +116,18 @@ void MemoryManager::updateLRU(int pid, int pageNumber) {
     lruMap[pid][pageNumber] = lruList.begin();
 }
 
-// bool MemoryManager::ensurePageLoaded(int pid, int virtualAddress) {
-//     //neww
-//     int pageNumber = virtualAddress / instructionsPerPage;
-//     if (pageTables[pid][pageNumber].valid) {
-//         accessPage(pid, pageNumber);
-//         return true;
-//     }
-
-//     int frame = getFreeFrame();
-//     if (frame == -1) {
-//         evictPageLRU();
-//         frame = getFreeFrame();
-//         if (frame == -1) return false;
-//     }
-
-//     //frameTable[frame] = true;
-//     frameTable[frame] = pid; //change from first line before it
-//     pageTables[pid][pageNumber] = {frame, true, 0};
-//     backingStore[pid].insert(pageNumber);
-//     updateLRU(pid, pageNumber);
-//     return true;
-//     //new
-// }
 
 bool MemoryManager::ensurePageLoaded(int pid, int virtualAddress) {
     int pageNumber = virtualAddress / instructionsPerPage;
 
-    // If page is already valid, just update LRU
-    // if (pageTables[pid][pageNumber].valid) {
-    //     accessPage(pid, pageNumber);
-    //     return true;
-    // }
 
-    //new
-   // int pageNumber = virtualAddress / instructionsPerPage;
-
-    // ✅ If page doesn't exist for this process, return false immediately
+    // If page doesn't exist for this process, return false immediately
     if (processTotalPages.find(pid) == processTotalPages.end() ||
         pageNumber >= processTotalPages[pid]) {
         return false; // Invalid page → no retry
     }
 
-    // ✅ If already loaded
+    // If already loaded
     if (pageTables[pid][pageNumber].valid) {
         accessPage(pid, pageNumber);
         return true;
@@ -175,15 +136,12 @@ bool MemoryManager::ensurePageLoaded(int pid, int virtualAddress) {
 
     // Try to get a free frame
     int frame = getFreeFrame();
-    // if (frame == -1) {
-    //     evictPageLRU();
-    //     frame = getFreeFrame();
-    // }
+   
     if (frame == -1) {
     evictPageLRU();
     frame = getFreeFrame();
         if (frame == -1) {
-            return false; // ✅ Stop instead of infinite retry
+            return false; // Stop instead of infinite retry
         }
     }
 
@@ -202,12 +160,12 @@ bool MemoryManager::ensurePageLoaded(int pid, int virtualAddress) {
 }
 
 
-//new
+
 void MemoryManager::accessPage(int pid, int pageNumber) {
     updateLRU(pid, pageNumber);
 }
 
-//new function -for vmstat
+//for vmstat
 void MemoryManager::printVMStat() const {
     std::cout << "\n=== VMSTAT ===\n";
     std::cout << "Total Frames: " << totalFrames << "\n";
@@ -264,7 +222,7 @@ void MemoryManager::printVMStat() const {
 }
 
 
-//new function for process-smi
+//for process-smi
 void MemoryManager::printProcessSMI() const{
     std::cout << "\n=== PROCESS-SMI ===\n";
     
@@ -311,7 +269,7 @@ void MemoryManager::printMemoryState() {
     std::cout << "Frame Table:\n";
     for (int i = 0; i < frameTable.size(); ++i) {
         std::cout << "Frame " << i << ": ";
-        if (frameTable[i] == -1) std::cout << "Free\n";
+        if (!frameTable[i]) std::cout << "Free\n";
         else std::cout << "PID " << frameTable[i] << "\n";
     }
 }

@@ -60,6 +60,7 @@ public:
     uint16_t readFromAddress(int pid, uint16_t address);
     std::string toHex(uint16_t value);
     int getRandomValidAddress(int pid);
+    int getInstructionPageNumber(int programCounter);
 
 
 private:

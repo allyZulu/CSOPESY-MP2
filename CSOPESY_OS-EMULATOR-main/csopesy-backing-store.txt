@@ -1,0 +1,58 @@
+=== BACKING STORE SNAPSHOT ===
+Process PID: 27
+  Stored Page: 1
+  Stored Page: 0
+
+Process PID: 1
+  Stored Page: 1
+  Stored Page: 0
+
+Process PID: 3
+  Stored Page: 1
+  Stored Page: 0
+
+Process PID: 5
+  Stored Page: 1
+  Stored Page: 0
+
+Process PID: 7
+  Stored Page: 1
+  Stored Page: 0
+
+Process PID: 9
+  Stored Page: 1
+  Stored Page: 0
+
+Process PID: 11
+  Stored Page: 1
+  Stored Page: 0
+
+Process PID: 13
+  Stored Page: 1
+  Stored Page: 0
+
+Process PID: 15
+  Stored Page: 1
+  Stored Page: 0
+
+Process PID: 17
+  Stored Page: 1
+  Stored Page: 0
+
+Process PID: 19
+  Stored Page: 1
+  Stored Page: 0
+
+Process PID: 21
+  Stored Page: 1
+  Stored Page: 0
+
+Process PID: 23
+  Stored Page: 1
+  Stored Page: 0
+
+Process PID: 25
+  Stored Page: 1
+  Stored Page: 0
+
+==============================

@@ -56,6 +56,7 @@ public:
     bool hasTerminatedDueToViolation() const;
     std::string getViolationTime() const;
     std::string getViolationAddress() const;
+    int getProgramCounter() const;
 
 
 private:

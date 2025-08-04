@@ -26,6 +26,7 @@ public:
     //new
     bool allProcessesFinished() const;
     bool isIdle() const;
+    void assignProcessesToCores();
 
 
 private:
@@ -47,6 +48,6 @@ private:
 
     bool isRunning;
 
-    void assignProcessesToCores();
+    
     void executeProcesses();
 };

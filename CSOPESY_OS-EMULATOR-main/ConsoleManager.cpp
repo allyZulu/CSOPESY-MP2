@@ -1,6 +1,7 @@
 #include "ConsoleManager.h"
 #include "Instruction.h"
 #include "InstructionsTypes.h"
+#include "Scheduler.h"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -61,16 +62,17 @@ void Option2() {
     std::cout << "- exit" << std::endl;
 }
 
+//Check if power of 2
 bool isPowerOfTwo(int n) {
     return n > 0 && (n & (n - 1)) == 0;
 }
 
-
+//Check if within mem size range and power
 bool isValidMemSize(int size) {
     return size >= 64 && size <= 65536 && isPowerOfTwo(size);
 } 
 
-//New trim string
+//Trim Stings 
 std::string trim(const std::string& s) {
     auto start = s.begin();
     while (start != s.end() && std::isspace(*start)) {
@@ -115,7 +117,6 @@ void ConsoleManager::run() {
                 std::cout << "Invalid memory allocation.\n";
                 continue;
             }
-            //new
             screenAttach(name, memSize);
         } else if (input.rfind("screen -r ", 0) == 0) {
             std::string name = input.substr(10);
@@ -142,9 +143,7 @@ void ConsoleManager::run() {
                 std::cout << "Invalid memory allocation.\n";
                 return;
             }
-
             screenCustom(name, memSize, instructions);
-
         //new - vmstat 
         } else if (input == "vmstat") {
             if(!memoryManager){
@@ -240,45 +239,16 @@ void ConsoleManager::startScheduler() {
         scheduler->addProcess(allProcesses.back());
     }
 
+    
     //start ticking
     ticking = true;
     generating = true;
 
 
-    //thick thread
-    // schedulerThread = std::thread([this](){
-    //     while (ticking){
-    //         scheduler->tick();
-    //         quantumCounter++;
-    //         if(quantumCounter % quantumCycles == 0){
-    //            // memoryManager->snapshot(quantumCounter); //snap shot every quantum cycle only 
-    //         }  
-    //         std::this_thread::sleep_for(std::chrono::milliseconds(cpuCycleTicks));
-    //     }
-
-    // });
     schedulerThread = std::thread([this]() {
     while (ticking) {
         scheduler->tick();
         quantumCounter++;
-
-            if (quantumCounter % quantumCycles == 0) {
-                // memoryManager->snapshot(quantumCounter);
-            }
-
-            // ✅ Stop when all processes are done and scheduler is idle
-            // if (scheduler->allProcessesFinished() && scheduler->isIdle()) {
-            //     std::cout << "All processes finished. Stopping scheduler thread.\n";
-            //     ticking = false; // Stop ticking loop
-            //     break;
-            // }
-
-            if (scheduler->allProcessesFinished() && scheduler->isIdle()) {
-                std::cout << "\nAll processes finished. Stopping scheduler thread.\n";
-                ticking = false;
-                generating = false;
-                break;
-            }
 
             std::this_thread::sleep_for(std::chrono::milliseconds(cpuCycleTicks));
         }
@@ -314,11 +284,8 @@ void ConsoleManager::stopScheduler() {
     }
 
     std::cout << "Stopping automatic process generation...\n";
-    generating = false;
-
-     // new
-    ticking = false; // di na gagawa ng instructions 
-     // new
+    generating = false; ///stop generating dummy processes
+    ticking = true; // still perform scheduling algo  
 
     std::cout << "No new processes will be auto-generated. Scheduler is still running.\n";
 }
@@ -395,7 +362,7 @@ void ConsoleManager::createProcess(const std::string& name, int instructionCount
     memoryManager->registerProcess(proc->getPID(), totalPages);
 
     if(!memoryManager->allocateMemory(proc)){
-            std::cout << "Insufficient memory for process " << name << "\n";
+            //std::cout << "Insufficient memory for process " << name << "\n";
             return; // Don't create process
     }
    

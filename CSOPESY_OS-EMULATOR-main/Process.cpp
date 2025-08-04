@@ -175,3 +175,7 @@ std::string Process::getViolationTime() const {
 std::string Process::getViolationAddress() const {
     return violationAddress;
 }
+
+int Process::getProgramCounter() const {
+    return commandCounter;
+}
