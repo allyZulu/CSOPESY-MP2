@@ -1,5 +1,5 @@
 
-Final CSOPESY MO2 is in the **mo2 Branch**
+# Final CSOPESY MO2 is in the **mo2 Branch**
 
 Developers:
 Alcantara, Keira S22
