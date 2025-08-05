@@ -142,7 +142,12 @@ void ConsoleManager::run() {
                 return;
             }
 
-            screenCustom(name, memSize, instructions);
+            //screenCustom(name, memSize, instructions);
+            try {
+                screenCustom(name, memSize, instructions);
+                } catch (const std::exception& e) {
+                    std::cout << "An error occurred: " << e.what() << "\n";
+                }
 
         //new - vmstat 
         } else if (input == "vmstat") {
@@ -425,65 +430,111 @@ void ConsoleManager::createProcess(const std::string& name, int instructionCount
     }
 }
 
-//new - screeen -c custom input
-void ConsoleManager::screenCustom(const std::string& name, uint32_t memSize, const std::string& instructionStr) {
+//new Screen Custom
+void ConsoleManager::screenCustom(const std::string& name, uint16_t memSize, const std::string& instructionStr) {
     std::vector<std::shared_ptr<Instruction>> insts;
 
-    std::istringstream stream(instructionStr);
-    std::string token;
+    // Tokenize by semicolon but respect quoted sections (e.g., inside PRINT)
+    std::vector<std::string> tokens;
+    std::string current;
+    bool inQuotes = false;
 
-    while (std::getline(stream, token, ';')){
+    for (char c : instructionStr) {
+        if (c == '"') inQuotes = !inQuotes;
+        if (c == ';' && !inQuotes) {
+            tokens.push_back(trim(current));
+            current.clear();
+        } else {
+            current += c;
+        }
+    }
+    if (!current.empty()) {
+        tokens.push_back(trim(current));
+    }
+
+    for (std::string& token : tokens) {
         std::istringstream line(token);
         std::string type;
         line >> type;
 
         if (type == "READ") {
-            std::string var;
-            std::string addrStr;
+            std::string var, addrStr;
             line >> var >> addrStr;
             int addr = std::stoi(addrStr, nullptr, 16);
+            insts.push_back(std::make_shared<ReadInstruction>(var, addr, memoryManager.get()));
 
-            auto readInst = std::make_shared<ReadInstruction>(var, addr, memoryManager.get());
-            insts.push_back(readInst);
         } else if (type == "WRITE") {
-            std::string addrStr;
-            int value;
+            std::string addrStr, value;
             line >> addrStr >> value;
             int addr = std::stoi(addrStr, nullptr, 16);
-
             std::stringstream ss;
             ss << std::hex << addr;
             std::string hexAddr = ss.str();
+            insts.push_back(std::make_shared<WriteInstruction>(hexAddr, value));
 
-            auto writeInst = std::make_shared<WriteInstruction>(hexAddr, std::to_string(value));
-            insts.push_back(writeInst);
+        } else if (type == "DECLARE") {
+            std::string varName, valueStr;
+            line >> varName >> valueStr;
+
+            uint16_t value = 0;
+            try {
+                value = static_cast<uint16_t>(std::stoi(valueStr));
+            } catch (...) {
+                std::cout << "Invalid value for DECLARE instruction: " << valueStr << "\n";
+                return;
+            }
+            
+            insts.push_back(std::make_shared<DeclareInstruction>(varName, value));
+
+        } else if (type == "ADD") {
+            std::string dest, op1, op2;
+            line >> dest >> op1 >> op2;
+            insts.push_back(std::make_shared<AddInstruction>(dest, op1, op2));
+
+        } else if (type == "SUBTRACT") {
+            std::string dest, op1, op2;
+            line >> dest >> op1 >> op2;
+            insts.push_back(std::make_shared<SubtractInstruction>(dest, op1, op2));
+
+        } else if (type == "PRINT") {
+            // Reconstruct entire remaining line (may include spaces, quotes, + signs)
+            std::string printContent;
+            std::getline(line, printContent);
+            printContent = trim(printContent);
+            if (!printContent.empty() && printContent.front() == '(' && printContent.back() == ')') {
+                printContent = printContent.substr(1, printContent.size() - 2); // Remove surrounding ()
+            }
+            insts.push_back(std::make_shared<PrintInstruction>(printContent));
+
         } else {
             std::cout << "Unknown instruction type: " << type << "\n";
             return;
         }
     }
-    
+
     if (insts.empty() || insts.size() > 50) {
         std::cout << "Invalid number of instructions (1–50 allowed).\n";
         return;
     }
-    
+
     auto proc = std::make_shared<Process>(++currentPID, name, insts.size());
     proc->setInstructions(insts);
     proc->setMemoryRequirement(memSize);
 
     int frameSize = memoryManager->getFrameSize();
     int totalPages = (memSize + frameSize - 1) / frameSize;
-    memoryManager->registerProcess(proc->getPID(), totalPages);
+    //memoryManager->registerProcess(proc->getPID(), totalPages);
 
-     if (!memoryManager->allocateMemory(proc)) {
+    if (!memoryManager->allocateMemory(proc)) {
         std::cout << "Insufficient memory for process " << name << "\n";
+
+        memoryManager->deallocateMemory(proc);
         return;
-    }
+    } 
 
     processTable[name] = proc;
     allProcesses.push_back(proc);
-
+    
     if (scheduler) {
         scheduler->addProcess(proc);
     } else {
@@ -492,7 +543,120 @@ void ConsoleManager::screenCustom(const std::string& name, uint32_t memSize, con
 
     processScreen(proc);
 }
+
+//new - screeen -c custom input
+// void ConsoleManager::screenCustom(const std::string& name, uint16_t memSize, const std::string& instructionStr) {
+//     std::vector<std::shared_ptr<Instruction>> insts;
+
+//     std:: string cleanInstructionStr = instructionStr;
+
+//     if(!cleanInstructionStr.empty() && cleanInstructionStr.front() == '"'){
+//         cleanInstructionStr.erase(0,1);
+//     }
+
+//     if(!cleanInstructionStr.empty() && cleanInstructionStr.back() == '"'){
+//         cleanInstructionStr.pop_back();
+//     }
+
+//     std::istringstream stream(cleanInstructionStr);
+//     std::string token;
+
+//     while (std::getline(stream, token, ';')){
+//         std::istringstream line(token);
+//         std::string type;
+//         line >> type;
+
+//         type = trim(type);
+//         if (!type.empty() && type.front() == '"') type.erase(0, 1);
+//         if (!type.empty() && type.back() == '"') type.pop_back();
+
+//         if (type == "READ") {
+//             std::string var;
+//             std::string addrStr;
+//             line >> var >> addrStr;
+//             int addr = std::stoi(addrStr, nullptr, 16);
+
+//             auto readInst = std::make_shared<ReadInstruction>(var, addr, memoryManager.get());
+//             insts.push_back(readInst);
+//         } else if (type == "WRITE") {
+//             std::string addrStr;
+//             int value;
+//             line >> addrStr >> value;
+//             int addr = std::stoi(addrStr, nullptr, 16);
+
+//             std::stringstream ss;
+//             ss << std::hex << addr;
+//             std::string hexAddr = ss.str();
+
+//             auto writeInst = std::make_shared<WriteInstruction>(hexAddr, std::to_string(value));
+//             insts.push_back(writeInst);
+//         } else if (type == "DECLARE"){
+//             std::string var;
+//             int value;
+//             line >> var >> value;
+//             auto declInst = std::make_shared<DeclareInstruction>(var, value);
+//             insts.push_back(declInst);
+//         } else if (type == "ADD"){
+//             std::string dest, op1, op2;
+//             line >> dest >> op1 >> op2;
+//             auto addInst = std::make_shared<AddInstruction>(dest, op1, op2);
+//             insts.push_back(addInst);
+//         } else if (type == "SUBTRACT"){
+//             std::string dest, op1, op2;
+//             line >> dest >> op1 >> op2;
+//             auto subInst = std::make_shared<SubtractInstruction>(dest, op1, op2);
+//             insts.push_back(subInst);
+//         } else if (type == "PRINT"){
+//             std::string remaining;
+//             std::getline(line, remaining);
+//             remaining = trim(remaining);
+
+//             // Handle quoted string
+//             if (!remaining.empty() && remaining.front() == '"' && remaining.back() == '"') {
+//                 remaining = remaining.substr(1, remaining.size() - 2);
+//             }
+
+//             auto printInst = std::make_shared<PrintInstruction>(remaining);
+//             insts.push_back(printInst);
+//         }
+//         else {
+//             std::cout << "Unknown instruction type: " << type << "\n";
+//             return;
+//         }
+//     }
+    
+//     if (insts.empty() || insts.size() > 50) {
+//         std::cout << "Invalid number of instructions (1–50 allowed).\n";
+//         return;
+//     }
+    
+//     auto proc = std::make_shared<Process>(++currentPID, name, insts.size());
+//     proc->setInstructions(insts);
+//     proc->setMemoryRequirement(memSize);
+
+//     int frameSize = memoryManager->getFrameSize();
+//     int totalPages = (memSize + frameSize - 1) / frameSize;
+//     memoryManager->registerProcess(proc->getPID(), totalPages);
+
+//      if (!memoryManager->allocateMemory(proc)) {
+//         std::cout << "Insufficient memory for process " << name << "\n";
+//         return;
+//     }
+
+//     processTable[name] = proc;
+//     allProcesses.push_back(proc);
+
+//     if (scheduler) {
+//         scheduler->addProcess(proc);
+//     } else {
+//         std::cout << "Scheduler not running. Process idle.\n";
+//     }
+
+//     processScreen(proc);
+// }
 //new
+
+
 
 //screen -ls (show ongoing and finished processes)
 void ConsoleManager::listScreens() {

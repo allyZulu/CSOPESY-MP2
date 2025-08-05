@@ -26,7 +26,7 @@ public:
     int getCurrentPID() const;
     void printConfig() const;
     //new
-    void screenCustom(const std::string& name, uint32_t memSize, const std::string& instructionStr);
+    void screenCustom(const std::string& name, uint16_t memSize, const std::string& instructionStr);
     //new
 
 private:
