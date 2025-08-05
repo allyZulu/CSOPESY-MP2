@@ -12,7 +12,7 @@ How to run:
 2. Make sure all files are in the same directory (including the config.txt file)
 3. Set up the config.txt file with your desired configurations
 4. Open up the command line and make sure you are in the right directory
-5. Compile using: g++ -o os_emulator.exe main.cpp ConsoleManager.cpp Scheduler.cpp Process.cpp Instruction.cpp
+5. Compile using: g++ -o os_emulator.exe main.cpp ConsoleManager.cpp Scheduler.cpp Process.cpp Instruction.cpp MemoryManager.cpp
 6. Run using : os_emulator.exe
 7. After running the program type in “initialize” command to start the emulator, it will set up the emulator given the configurations found in the text file
 8. Enter “scheduler-start” to start the scheduling algorithm and continuously produce dummy processes
