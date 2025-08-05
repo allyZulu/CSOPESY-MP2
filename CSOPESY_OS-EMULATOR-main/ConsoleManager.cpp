@@ -232,44 +232,65 @@ void ConsoleManager::loadConfig() {
 void ConsoleManager::startScheduler() {
     std::cout << "Starting process generation...\n";
 
-    scheduler = std::make_unique<Scheduler>(numCPU, schedulerAlgo, quantumCycles, delayPerExec, memoryManager.get());
+    if(!scheduler){
 
-    // For simulation
-    for (int i = 0; i < batchProcessFreq; ++i) {
-        std::string procName = "p" + std::to_string(currentPID + 1);
+        scheduler = std::make_unique<Scheduler>(numCPU, schedulerAlgo, quantumCycles, delayPerExec, memoryManager.get());
 
-        int instCount = minInstructions + (rand() % (maxInstructions - minInstructions + 1));
-        createProcess(procName, instCount, true);
-        scheduler->addProcess(allProcesses.back());
+        // For simulation
+        for (int i = 0; i < batchProcessFreq; ++i) {
+            std::string procName = "p" + std::to_string(currentPID + 1);
+
+            int instCount = minInstructions + (rand() % (maxInstructions - minInstructions + 1));
+            createProcess(procName, instCount, true);
+            scheduler->addProcess(allProcesses.back());
+        }
+
+        //start ticking
+        ticking = true;
+        generating = true;
+
+        // Thread 1: ticking scheduler
+        std::thread([this]() {
+            while (ticking) {
+                scheduler->tick();
+                quantumCounter++;
+                std::this_thread::sleep_for(std::chrono::milliseconds(cpuCycleTicks));
+            }
+        }).detach();
+
+        // Thread 2: generating processes
+        std::thread([this]() {
+            try {
+                while (generating) {
+                    std::this_thread::sleep_for(std::chrono::seconds(batchProcessFreq));
+                    std::string procName = "p" + std::to_string(currentPID + 1);
+                    int instCount = minInstructions + (rand() % (maxInstructions - minInstructions + 1));
+                    createProcess(procName, instCount, false);
+                    scheduler->addProcess(allProcesses.back());
+                }
+            } catch (const std::exception& e) {
+                std::cerr << "[Error in process generation thread] " << e.what() << std::endl;
+            }
+        }).detach();
+
+    } else {
+        std::cout << "[Info] Scheduler already running. Creating initial batch of processes only...\n";
+
+         std::thread([this]() {
+            try {
+                while (generating) {
+                    std::this_thread::sleep_for(std::chrono::seconds(batchProcessFreq));
+                    std::string procName = "p" + std::to_string(currentPID + 1);
+                    int instCount = minInstructions + (rand() % (maxInstructions - minInstructions + 1));
+                    createProcess(procName, instCount, false);
+                    scheduler->addProcess(allProcesses.back());
+                }
+            } catch (const std::exception& e) {
+                std::cerr << "[Error in process generation thread] " << e.what() << std::endl;
+            }
+        }).detach();
     }
 
-    //start ticking
-    ticking = true;
-    generating = true;
-
-    // Thread 1: ticking scheduler
-    std::thread([this]() {
-        while (ticking) {
-            scheduler->tick();
-            quantumCounter++;
-            std::this_thread::sleep_for(std::chrono::milliseconds(cpuCycleTicks));
-        }
-    }).detach();
-
-    // Thread 2: generating processes
-    std::thread([this]() {
-        try {
-            while (generating) {
-                std::this_thread::sleep_for(std::chrono::seconds(batchProcessFreq));
-                std::string procName = "p" + std::to_string(currentPID + 1);
-                int instCount = minInstructions + (rand() % (maxInstructions - minInstructions + 1));
-                createProcess(procName, instCount, false);
-                scheduler->addProcess(allProcesses.back());
-            }
-        } catch (const std::exception& e) {
-            std::cerr << "[Error in process generation thread] " << e.what() << std::endl;
-        }
-    }).detach();
 
     std::cout<<"Scheduler started\n"; 
 }
@@ -571,15 +592,17 @@ void ConsoleManager::screenAttach(const std::string& name, int memSize) {
                 while (ticking) {
                     scheduler->tick();
                     quantumCounter++;
-                    std::this_thread::sleep_for(std::chrono::milliseconds(batchProcessFreq));
+                    std::this_thread::sleep_for(std::chrono::milliseconds(cpuCycleTicks));
                 }
             }).detach();
 
             std::cout << "[Auto-start] Scheduler started.\n";
-      
-        }
+        
+        }else{
+           scheduler->addProcess(allProcesses.back());
+        } 
 
-        scheduler->addProcess(processTable[name]);
+        scheduler->addProcess(allProcesses.back());
 
     }
     processScreen(processTable[name]);
