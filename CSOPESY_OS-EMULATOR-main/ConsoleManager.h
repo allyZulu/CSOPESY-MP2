@@ -27,6 +27,7 @@ public:
     void printConfig() const;
     //new
     void screenCustom(const std::string& name, uint16_t memSize, const std::string& instructionStr);
+    void createProcessforScreen(const std::string& name, int instructionCount, bool silent, int memSize);
     //new
 
 private:

@@ -274,63 +274,6 @@ void ConsoleManager::startScheduler() {
 
     std::cout<<"Scheduler started\n"; 
 }
-//ALLIYAH 
-
-/*
-void ConsoleManager::startScheduler() {
-    std::cout << "Starting process generation...\n";
-
-    scheduler = std::make_unique<Scheduler>(numCPU, schedulerAlgo, quantumCycles, delayPerExec, memoryManager.get());
-
-    //scheduler = std::make_unique<Scheduler>(numCPU, schedulerAlgo, quantumCycles);
-    // For simulation
-    for (int i = 0; i < batchProcessFreq; ++i) {
-        std::string procName = "p" + std::to_string(currentPID + 1);
-
-        int instCount = minInstructions + (rand() % (maxInstructions - minInstructions + 1));
-        createProcess(procName, instCount, true);
-        scheduler->addProcess(allProcesses.back());
-    }
-
-    //start ticking
-    ticking = true;
-    generating = true;
-
-
-    //thick thread
-    schedulerThread = std::thread([this](){
-        while (ticking){
-            scheduler->tick();
-            quantumCounter++;  
-            std::this_thread::sleep_for(std::chrono::milliseconds(cpuCycleTicks));
-        }
-
-    });
-
-    //make processes in the background
-    std::thread([this](){
-
-        try {
-        while(generating){
-            std::this_thread::sleep_for(std::chrono::seconds(batchProcessFreq));
-            std::string procName = "p" + std::to_string(currentPID);
-            int instCount = minInstructions + (rand() % (maxInstructions - minInstructions + 1));
-            createProcess(procName, instCount, false);
-            scheduler->addProcess(allProcesses.back());
-        }
-        } catch (const std::exception& e) {
-            std::cerr << "[Error in process generation thread] " << e.what() << std::endl;
-        } catch (...) {
-            std::cerr << "[Unknown error in process generation thread]\n";
-        }
-
-    }).detach();
-
-  
-    std::cout<<"Scheduler started\n"; 
-
-}
-    */
 
 void ConsoleManager::stopScheduler() {
 
@@ -452,6 +395,7 @@ void ConsoleManager::screenCustom(const std::string& name, uint16_t memSize, con
         tokens.push_back(trim(current));
     }
 
+    //parse instructions
     for (std::string& token : tokens) {
         std::istringstream line(token);
         std::string type;
@@ -512,149 +456,64 @@ void ConsoleManager::screenCustom(const std::string& name, uint16_t memSize, con
         }
     }
 
-    if (insts.empty() || insts.size() > 50) {
-        std::cout << "Invalid number of instructions (1–50 allowed).\n";
-        return;
-    }
+    std::cout << "test";
+    std::cout << insts.size();
 
-    auto proc = std::make_shared<Process>(++currentPID, name, insts.size());
-    proc->setInstructions(insts);
-    proc->setMemoryRequirement(memSize);
+    createProcessforScreen(name, insts.size(), true, memSize);
 
-    int frameSize = memoryManager->getFrameSize();
-    int totalPages = (memSize + frameSize - 1) / frameSize;
-    //memoryManager->registerProcess(proc->getPID(), totalPages);
+    if (processTable.find(name) == processTable.end()) {
+            // Process creation failed due to memory
+            return;
+        }
 
-    if (!memoryManager->allocateMemory(proc)) {
-        std::cout << "Insufficient memory for process " << name << "\n";
+    // if (insts.empty() || insts.size() > 50) {
+    //     std::cout << "Invalid number of instructions (1–50 allowed).\n";
+    //     return;
+    // }
 
-        memoryManager->deallocateMemory(proc);
-        return;
-    } 
+    // auto proc = std::make_shared<Process>(++currentPID, name, insts.size());
+    // proc->setInstructions(insts);
+    // proc->setMemoryRequirement(memSize);
 
-    processTable[name] = proc;
-    allProcesses.push_back(proc);
+    // int frameSize = memoryManager->getFrameSize();
+    // int totalPages = (memSize + frameSize - 1) / frameSize;
+    // //memoryManager->registerProcess(proc->getPID(), totalPages);
+
+    // if (!memoryManager->allocateMemory(proc)) {
+    //     std::cout << "Insufficient memory for process " << name << "\n";
+
+    //     memoryManager->deallocateMemory(proc);
+    //     return;
+    // } 
+
+    // processTable[name] = proc;
+    // allProcesses.push_back(proc);
     
-    if (scheduler) {
-        scheduler->addProcess(proc);
-    } else {
-        std::cout << "Scheduler not running. Process idle.\n";
-    }
+    if(!scheduler){
+            std::cout << "[Auto-start] Scheduler was not running. Starting scheduler now...\n";
+    
+            scheduler = std::make_unique<Scheduler>(numCPU, schedulerAlgo, quantumCycles, delayPerExec, memoryManager.get());
 
-    processScreen(proc);
+            ticking = true;
+            generating = true;
+
+            std::thread([this]() {
+                while (ticking) {
+                    scheduler->tick();
+                    quantumCounter++;
+                    std::this_thread::sleep_for(std::chrono::milliseconds(batchProcessFreq));
+                }
+            }).detach();
+
+            std::cout << "[Auto-start] Scheduler started.\n";
+      
+        }
+
+        scheduler->addProcess(processTable[name]);
+        processScreen(processTable[name]);
+
+    //processScreen(proc);
 }
-
-//new - screeen -c custom input
-// void ConsoleManager::screenCustom(const std::string& name, uint16_t memSize, const std::string& instructionStr) {
-//     std::vector<std::shared_ptr<Instruction>> insts;
-
-//     std:: string cleanInstructionStr = instructionStr;
-
-//     if(!cleanInstructionStr.empty() && cleanInstructionStr.front() == '"'){
-//         cleanInstructionStr.erase(0,1);
-//     }
-
-//     if(!cleanInstructionStr.empty() && cleanInstructionStr.back() == '"'){
-//         cleanInstructionStr.pop_back();
-//     }
-
-//     std::istringstream stream(cleanInstructionStr);
-//     std::string token;
-
-//     while (std::getline(stream, token, ';')){
-//         std::istringstream line(token);
-//         std::string type;
-//         line >> type;
-
-//         type = trim(type);
-//         if (!type.empty() && type.front() == '"') type.erase(0, 1);
-//         if (!type.empty() && type.back() == '"') type.pop_back();
-
-//         if (type == "READ") {
-//             std::string var;
-//             std::string addrStr;
-//             line >> var >> addrStr;
-//             int addr = std::stoi(addrStr, nullptr, 16);
-
-//             auto readInst = std::make_shared<ReadInstruction>(var, addr, memoryManager.get());
-//             insts.push_back(readInst);
-//         } else if (type == "WRITE") {
-//             std::string addrStr;
-//             int value;
-//             line >> addrStr >> value;
-//             int addr = std::stoi(addrStr, nullptr, 16);
-
-//             std::stringstream ss;
-//             ss << std::hex << addr;
-//             std::string hexAddr = ss.str();
-
-//             auto writeInst = std::make_shared<WriteInstruction>(hexAddr, std::to_string(value));
-//             insts.push_back(writeInst);
-//         } else if (type == "DECLARE"){
-//             std::string var;
-//             int value;
-//             line >> var >> value;
-//             auto declInst = std::make_shared<DeclareInstruction>(var, value);
-//             insts.push_back(declInst);
-//         } else if (type == "ADD"){
-//             std::string dest, op1, op2;
-//             line >> dest >> op1 >> op2;
-//             auto addInst = std::make_shared<AddInstruction>(dest, op1, op2);
-//             insts.push_back(addInst);
-//         } else if (type == "SUBTRACT"){
-//             std::string dest, op1, op2;
-//             line >> dest >> op1 >> op2;
-//             auto subInst = std::make_shared<SubtractInstruction>(dest, op1, op2);
-//             insts.push_back(subInst);
-//         } else if (type == "PRINT"){
-//             std::string remaining;
-//             std::getline(line, remaining);
-//             remaining = trim(remaining);
-
-//             // Handle quoted string
-//             if (!remaining.empty() && remaining.front() == '"' && remaining.back() == '"') {
-//                 remaining = remaining.substr(1, remaining.size() - 2);
-//             }
-
-//             auto printInst = std::make_shared<PrintInstruction>(remaining);
-//             insts.push_back(printInst);
-//         }
-//         else {
-//             std::cout << "Unknown instruction type: " << type << "\n";
-//             return;
-//         }
-//     }
-    
-//     if (insts.empty() || insts.size() > 50) {
-//         std::cout << "Invalid number of instructions (1–50 allowed).\n";
-//         return;
-//     }
-    
-//     auto proc = std::make_shared<Process>(++currentPID, name, insts.size());
-//     proc->setInstructions(insts);
-//     proc->setMemoryRequirement(memSize);
-
-//     int frameSize = memoryManager->getFrameSize();
-//     int totalPages = (memSize + frameSize - 1) / frameSize;
-//     memoryManager->registerProcess(proc->getPID(), totalPages);
-
-//      if (!memoryManager->allocateMemory(proc)) {
-//         std::cout << "Insufficient memory for process " << name << "\n";
-//         return;
-//     }
-
-//     processTable[name] = proc;
-//     allProcesses.push_back(proc);
-
-//     if (scheduler) {
-//         scheduler->addProcess(proc);
-//     } else {
-//         std::cout << "Scheduler not running. Process idle.\n";
-//     }
-
-//     processScreen(proc);
-// }
-//new
 
 
 
@@ -723,7 +582,7 @@ void ConsoleManager::screenAttach(const std::string& name, int memSize) {
     // If process does not exist, create it
     if (processTable.count(name) == 0) {
         int instructionCount = minInstructions + (rand() % (maxInstructions - minInstructions + 1));
-        createProcess(name, instructionCount, true);
+        createProcessforScreen(name, instructionCount, true, memSize);
 
         //new
         if (processTable.find(name) == processTable.end()) {
@@ -732,16 +591,112 @@ void ConsoleManager::screenAttach(const std::string& name, int memSize) {
         }
         //new
 
-        if (scheduler) {
-            scheduler->addProcess(processTable[name]);
-        } else {
-            std::cout << "Scheduler not started yet. Process will be idle until scheduler starts.\n";
-        }
-    }
+        // if (scheduler) {
+        //     scheduler->addProcess(processTable[name]);
+        // } else {
+        //     std::cout << "Scheduler not started yet. Process will be idle until scheduler starts.\n";
+        // }
 
+        //if there is no scheduler yet create one
+        if(!scheduler){
+            std::cout << "[Auto-start] Scheduler was not running. Starting scheduler now...\n";
+    
+            scheduler = std::make_unique<Scheduler>(numCPU, schedulerAlgo, quantumCycles, delayPerExec, memoryManager.get());
+
+            ticking = true;
+            generating = true;
+
+            std::thread([this]() {
+                while (ticking) {
+                    scheduler->tick();
+                    quantumCounter++;
+                    std::this_thread::sleep_for(std::chrono::milliseconds(batchProcessFreq));
+                }
+            }).detach();
+
+            std::cout << "[Auto-start] Scheduler started.\n";
+      
+        }
+
+        scheduler->addProcess(processTable[name]);
+
+    }
     processScreen(processTable[name]);
 }
 
+//new create process for screen -s
+void ConsoleManager::createProcessforScreen(const std::string& name, int instructionCount, bool silent, int memSize) {
+   auto proc = std::make_shared<Process>(++currentPID, name, instructionCount);
+    proc->setMemoryManager(memoryManager.get());
+
+    proc->setMemoryRequirement(memSize);
+
+    int frameSize = memoryManager->getFrameSize();
+    int totalPages = (memSize + frameSize - 1) / frameSize; // division
+
+    memoryManager->registerProcess(proc->getPID(), totalPages);
+
+    if(!memoryManager->allocateMemory(proc)){
+            std::cout << "Insufficient memory for process " << name << "\n";
+            return; // Don't create process
+    }
+
+    // Generate dummy instructions
+    std::vector<std::shared_ptr<Instruction>> insts;
+    int varCounter = 0;
+
+    for (int i = 0; i < instructionCount; ++i) {
+
+        int opcode = rand() % 6; //include read write as instructions
+        std::string varName = "v" + std::to_string(varCounter);
+
+        switch(opcode){
+            case 0:
+                insts.push_back(std::make_shared<DeclareInstruction>(varName, rand() % 100));
+                varCounter++;
+                break;
+            case 1:
+                insts.push_back(std::make_shared<AddInstruction>("x", "x", "1"));
+                break;
+            case 2:
+                insts.push_back(std::make_shared<SubtractInstruction>("x", "x", "1"));
+                break;
+            case 3:
+                insts.push_back(std::make_shared<PrintInstruction>("Instruction executed."));
+                break;
+            case 4: {
+                // Generate a random address within allocated space
+                int address = memoryManager->getRandomValidAddress(proc->getPID());
+
+                std::stringstream addrStream;
+                addrStream << std::hex << address;
+                std::string hexAddr = "0x" + addrStream.str();
+
+                std::string readVar = "r" + std::to_string(varCounter++);
+                insts.push_back(std::make_shared<ReadInstruction>(readVar, address, memoryManager.get()));
+                break;
+            }
+            case 5: {
+                int address = memoryManager->getRandomValidAddress(proc->getPID());
+                uint16_t value = rand() % 65536;
+
+                std::stringstream addStream;
+                addStream << std::hex << address;
+                std::string hexAddr = "0x" + addStream.str();
+
+                insts.push_back(std::make_shared<WriteInstruction>(hexAddr, std::to_string(value)));
+                break;
+            }
+        }
+    }
+    proc->setInstructions(insts);
+    processTable[name] = proc;
+    allProcesses.push_back(proc);
+
+    if(silent){
+        std::cout << "Process " << name << " created with " << instructionCount << " instructions.\n";
+    }
+}
 
 void ConsoleManager::screenReattach(const std::string& name) {
     auto it = processTable.find(name);
