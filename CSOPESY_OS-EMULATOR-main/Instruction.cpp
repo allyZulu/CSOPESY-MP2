@@ -175,15 +175,13 @@ void WriteInstruction::execute(
             sleeping = true;
             return;
         }
-
-        // Check address validity
+         // Check address validity
         if (!memoryManager->isAddressValid(pid, addr)) {
             outputLog += "Memory violation: invalid address 0x" + address +
                          " for process " + processName + "\n";
             sleeping = true;
             return;
         }
-
         // Ensure page is loaded
         if (!memoryManager->ensurePageLoaded(pid, addr)) {
             outputLog += "Page fault on WRITE at address 0x" + address +

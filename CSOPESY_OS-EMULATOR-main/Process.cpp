@@ -7,6 +7,7 @@ Process::Process(int pid, const std::string& name, int lines)
     : pid(pid), name(name), commandCounter(0), linesOfCode(lines),
       coreID(-1), currentState(READY), sleeping(false), sleepTicks(0) {}
 
+/*
 void Process::executeNextInstruction(int coreID) {
     if (isFinished()) return;
 
@@ -63,6 +64,71 @@ void Process::executeNextInstruction(int coreID) {
         setTerminatedDueToViolation(oss.str(), address);
     }
 }
+*/   
+//ALLIYAH   
+void Process::executeNextInstruction(int coreID) {
+    if (isFinished()) return;
+
+    this->coreID = coreID;
+
+    if (sleeping) {
+        if (--sleepTicks <= 0) sleeping = false;
+        return;
+    }
+
+    int currentPage = commandCounter / memoryManager->getInstructionsPerPage();
+
+    // Ensure page is loaded
+    if (!memoryManager->ensurePageLoaded(pid, currentPage)) {
+        outputLog += "[Page Fault] Could not load page " + std::to_string(currentPage) + "\n";
+        sleeping = true;
+        return;
+    }
+
+    // Update LRU
+    memoryManager->accessPage(pid, currentPage);
+
+    if (commandCounter < linesOfCode && commandCounter < instructions.size()) {
+        try {
+            instructions[commandCounter]->execute(
+                name,
+                coreID,
+                variables,
+                outputLog,
+                sleeping,
+                sleepTicks,
+                memoryManager 
+            );
+        } catch (const std::exception& e) {
+            outputLog += "[Error] " + std::string(e.what()) + "\n";
+            sleeping = true;
+            return;
+        }
+        commandCounter++;
+    }
+
+    if (commandCounter >= linesOfCode) {
+        currentState = FINISHED;
+        markFinished();
+    }
+
+    //check if terminated due to memory violation (based on log)
+    if (sleeping && outputLog.find("Memory violation") != std::string::npos) {
+        auto now = std::chrono::system_clock::now();
+        std::time_t now_time = std::chrono::system_clock::to_time_t(now);
+        std::tm local_tm = *std::localtime(&now_time);
+
+        std::ostringstream oss;
+        oss << std::put_time(&local_tm, "%H:%M:%S");
+        std::string timestamp = oss.str();
+       
+        std::string address = "???"; // optional parse from log
+        setTerminatedDueToViolation(oss.str(), address);
+
+       //  setTerminatedDueToViolation(timestamp, "???");
+    }
+}
+//ALLIYAH 
 
 bool Process::isFinished() const {
     return currentState == FINISHED;
