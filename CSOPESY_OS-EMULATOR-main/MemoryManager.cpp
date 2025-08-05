@@ -117,6 +117,14 @@ void MemoryManager::updateLRU(int pid, int pageNumber) {
 bool MemoryManager::ensurePageLoaded(int pid, int virtualAddress) {
     //neww
     int pageNumber = virtualAddress / instructionsPerPage;
+
+    //added
+    if (!isAddressValid(pid, virtualAddress)) {
+        //std::cerr << "Invalid page access: page " << pageNumber << " is out of range for PID " << pid << "\n";
+        return false;
+    }
+
+
     if (pageTables[pid][pageNumber].valid) {
         accessPage(pid, pageNumber);
         return true;
@@ -236,6 +244,10 @@ void MemoryManager::printProcessSMI() const{
 int MemoryManager::getFrameFromVirtualAddress(int pid, int virtualAddress) {
     //new
     int pageNumber = virtualAddress / instructionsPerPage;
+
+    //added
+    if (!isAddressValid(pid, virtualAddress)) return -1;
+
     if (!pageTables[pid][pageNumber].valid) return -1;
     return pageTables[pid][pageNumber].frameNumber;
     //new

@@ -13,9 +13,6 @@ Scheduler::Scheduler(int numCores, const std::string& algorithm, int quantum, in
 
 
 void Scheduler::addProcess(std::shared_ptr<Process> process) {
-    // process->setState(Process::READY);
-    //new
-    //int result = memoryManager->allocateMemory(process);
     process->setState(Process::READY);
     readyQueue.push(process);
 }

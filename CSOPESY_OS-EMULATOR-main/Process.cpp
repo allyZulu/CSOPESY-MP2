@@ -128,7 +128,7 @@ void Process::executeNextInstruction(int coreID) {
        //  setTerminatedDueToViolation(timestamp, "???");
     }
 }
-//ALLIYAH 
+
 
 bool Process::isFinished() const {
     return currentState == FINISHED;

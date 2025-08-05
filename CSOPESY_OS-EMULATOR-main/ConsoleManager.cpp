@@ -52,11 +52,14 @@ void Option1() {
 void Option2() {
     std::cout << "\nOptions:" << std::endl;
     std::cout << "- screen -ls" << std::endl;
-    std::cout << "- screen -s [process name]" << std::endl;
+    std::cout << "- screen -s [process name] [memory size]" << std::endl;
     std::cout << "- screen -r [process name]" << std::endl;
+    std::cout << "- screen -c [process name] [memory size] [instructions]" << std::endl;
     std::cout << "- scheduler-start" << std::endl;
     std::cout << "- scheduler-stop" << std::endl;
     std::cout << "- report-util" << std::endl;
+    std::cout << "- vmstat" << std::endl;
+    std::cout << "- process-smi" << std::endl;
     std::cout << "- exit" << std::endl;
 }
 
@@ -69,7 +72,7 @@ bool isValidMemSize(int size) {
     return size >= 64 && size <= 65536 && isPowerOfTwo(size);
 } 
 
-//New trim string
+
 std::string trim(const std::string& s) {
     auto start = s.begin();
     while (start != s.end() && std::isspace(*start)) {
@@ -168,12 +171,10 @@ void ConsoleManager::run() {
 
 void ConsoleManager::initialize() {
     loadConfig();
-    //new
     int instructionSize = 4; //fixed mem ng mga instructions
      memoryManager = std::make_unique<MemoryManager>(
         maxOverallMem, memPerFrame, maxMemPerProc, instructionSize   
     );
-    //new
     isInitialized = true;
     std::cout << "System initialized successfully.\n";
 }
@@ -228,13 +229,11 @@ void ConsoleManager::loadConfig() {
 
 }
 
-//ALLIYAH 
 void ConsoleManager::startScheduler() {
     std::cout << "Starting process generation...\n";
 
     scheduler = std::make_unique<Scheduler>(numCPU, schedulerAlgo, quantumCycles, delayPerExec, memoryManager.get());
 
-    //scheduler = std::make_unique<Scheduler>(numCPU, schedulerAlgo, quantumCycles);
     // For simulation
     for (int i = 0; i < batchProcessFreq; ++i) {
         std::string procName = "p" + std::to_string(currentPID + 1);
@@ -284,10 +283,7 @@ void ConsoleManager::stopScheduler() {
 
     std::cout << "Stopping automatic process generation...\n";
     generating = false;
-
-     // new
     ticking = true; // will still run sched algo
-     // new
 
     std::cout << "No new processes will be auto-generated. Scheduler is still running.\n";
 }
@@ -456,8 +452,6 @@ void ConsoleManager::screenCustom(const std::string& name, uint16_t memSize, con
         }
     }
 
-    std::cout << "test";
-    std::cout << insts.size();
 
     createProcessforScreen(name, insts.size(), true, memSize);
 
@@ -466,28 +460,6 @@ void ConsoleManager::screenCustom(const std::string& name, uint16_t memSize, con
             return;
         }
 
-    // if (insts.empty() || insts.size() > 50) {
-    //     std::cout << "Invalid number of instructions (1–50 allowed).\n";
-    //     return;
-    // }
-
-    // auto proc = std::make_shared<Process>(++currentPID, name, insts.size());
-    // proc->setInstructions(insts);
-    // proc->setMemoryRequirement(memSize);
-
-    // int frameSize = memoryManager->getFrameSize();
-    // int totalPages = (memSize + frameSize - 1) / frameSize;
-    // //memoryManager->registerProcess(proc->getPID(), totalPages);
-
-    // if (!memoryManager->allocateMemory(proc)) {
-    //     std::cout << "Insufficient memory for process " << name << "\n";
-
-    //     memoryManager->deallocateMemory(proc);
-    //     return;
-    // } 
-
-    // processTable[name] = proc;
-    // allProcesses.push_back(proc);
     
     if(!scheduler){
             std::cout << "[Auto-start] Scheduler was not running. Starting scheduler now...\n";
@@ -501,7 +473,7 @@ void ConsoleManager::screenCustom(const std::string& name, uint16_t memSize, con
                 while (ticking) {
                     scheduler->tick();
                     quantumCounter++;
-                    std::this_thread::sleep_for(std::chrono::milliseconds(batchProcessFreq));
+                    std::this_thread::sleep_for(std::chrono::milliseconds(cpuCycleTicks));
                 }
             }).detach();
 
@@ -510,9 +482,6 @@ void ConsoleManager::screenCustom(const std::string& name, uint16_t memSize, con
         }
 
         scheduler->addProcess(processTable[name]);
-        processScreen(processTable[name]);
-
-    //processScreen(proc);
 }
 
 
@@ -584,20 +553,12 @@ void ConsoleManager::screenAttach(const std::string& name, int memSize) {
         int instructionCount = minInstructions + (rand() % (maxInstructions - minInstructions + 1));
         createProcessforScreen(name, instructionCount, true, memSize);
 
-        //new
+
         if (processTable.find(name) == processTable.end()) {
             // Process creation failed due to memory
             return;
         }
-        //new
-
-        // if (scheduler) {
-        //     scheduler->addProcess(processTable[name]);
-        // } else {
-        //     std::cout << "Scheduler not started yet. Process will be idle until scheduler starts.\n";
-        // }
-
-        //if there is no scheduler yet create one
+    
         if(!scheduler){
             std::cout << "[Auto-start] Scheduler was not running. Starting scheduler now...\n";
     
@@ -708,11 +669,11 @@ void ConsoleManager::screenReattach(const std::string& name) {
     // If process has terminated due to access violation, print error message
     auto proc = it->second;
     if (proc->hasTerminatedDueToViolation()) {
-    std::cout << "Process " << name 
-              << " shut down due to memory access violation error that occurred at "
-              << proc->getViolationTime() << ". "
-              << proc->getViolationAddress() << " invalid.\n";
-    return;
+        std::cout << "Process " << name 
+                << " shut down due to memory access violation error that occurred at "
+                << proc->getViolationTime() << ". "
+                << proc->getViolationAddress() << " invalid.\n";
+        return;
     }
 
     processScreen(it->second);
